@@ -13,7 +13,7 @@ import com.example.fitnesscoach.app.navigation.Routes
 
 
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun UserScreen(navController: NavHostController) {
     Scaffold { padding ->
         Column(
             modifier = Modifier
