@@ -90,7 +90,7 @@ app/
 
 - **Kotlin**
 - **Jetpack Compose**
-- **MVVM Architecture**
+- **Hybrid Architecture**
 - **CameraX** (planned integration)
 - **MediaPipe Pose** (planned integration)
 - **Room Database** (optional future extension)
