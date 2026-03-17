@@ -1,6 +1,6 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-Android-blue)
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
-![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange)
+![Architecture](https://img.shields.io/badge/Architecture-Hybrid-orange)
 
 # Fitness Coach App
 
