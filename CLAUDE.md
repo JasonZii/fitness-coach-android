@@ -73,3 +73,20 @@ Do not edit files outside your assigned module without coordinating with the own
 - **Material3 only**: do not mix `androidx.compose.material3` with `androidx.compose.material`.
 - Passwords stored as SHA-256 hashes.
 - Every public function requires at least one unit test (see `RULES.md` §4.4 for required acceptance-criteria tests).
+
+---
+
+## Current Progress
+
+### Completed today (2026-03-24) / 今日已完成
+
+- [x] `ALGORITHM.md` — full interface contracts for all algorithm modules / 算法模块完整接口约定
+- [x] `PRD.md` — product requirements document / 产品需求文档
+- [x] `RULES.md` — coding conventions / 编码规范
+- [x] `README.md` — project overview and module description / 项目概述和模块说明
+- [x] `CLAUDE.md` — Claude Code configuration / Claude Code 配置文件
+
+### Sprint 1 — Pending / Sprint 1 待完成
+
+- [ ] Skeleton normalisation function — Kotlin implementation + unit tests / 骨架归一化函数（Kotlin实现，含单元测试）
+- [ ] OE-DTW core logic — Kotlin implementation + unit tests / OE-DTW核心逻辑（Kotlin实现，含单元测试）
