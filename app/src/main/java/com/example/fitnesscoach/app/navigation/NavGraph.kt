@@ -8,17 +8,26 @@ import androidx.navigation.compose.composable
 import com.example.fitnesscoach.record.ui.RecordScreen
 import com.example.fitnesscoach.home.ui.HomeScreen
 import com.example.fitnesscoach.training.ui.TrainingScreen
-import com.example.fitnesscoach.user.ui.UserScreen
+import com.example.fitnesscoach.user.ui.LoginScreen
+import com.example.fitnesscoach.user.ui.RegisterScreen
+import com.example.fitnesscoach.user.ui.ProfileScreen
+import com.example.fitnesscoach.user.viewmodel.UserViewModel
+
 object Routes {
     const val HOME = "home"
     const val USER = "user"
     const val TRAINING = "training"
     const val RECORD = "record"
+    const val REGISTER = "register"
+    const val PROFILE = "profile"
 }
 
-
 @Composable
-fun AppNavGraph(navController: NavHostController, modifier: Modifier) {
+fun AppNavGraph(
+    navController: NavHostController,
+    userViewModel: UserViewModel,
+    modifier: Modifier
+) {
     NavHost(
         navController = navController,
         startDestination = Routes.HOME
@@ -27,7 +36,8 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier) {
             HomeScreen(navController)
         }
         composable(Routes.USER) {
-            UserScreen(navController)
+//            UserScreen(navController)
+            LoginScreen(navController, userViewModel)
         }
         composable(Routes.TRAINING) {
             TrainingScreen(navController)
@@ -35,5 +45,12 @@ fun AppNavGraph(navController: NavHostController, modifier: Modifier) {
         composable(Routes.RECORD) {
             RecordScreen(navController)
         }
+        composable(Routes.REGISTER) {
+            RegisterScreen(navController, userViewModel)
+        }
+        composable(Routes.PROFILE) {
+            ProfileScreen(navController, userViewModel)
+        }
+
     }
 }

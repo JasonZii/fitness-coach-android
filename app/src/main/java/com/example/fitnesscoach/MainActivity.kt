@@ -15,90 +15,18 @@ import androidx.navigation.compose.rememberNavController
 import com.example.fitnesscoach.app.navigation.AppNavGraph
 import com.example.fitnesscoach.app.navigation.FitnessBottomBar
 import com.example.fitnesscoach.ui.theme.FitnessCoachTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.fitnesscoach.user.viewmodel.UserViewModel
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        enableEdgeToEdge()
-//        setContent {
-//            FitnessCoachTheme {
-//                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-//                    Greeting(
-//                        name = "Android",
-//                        modifier = Modifier.padding(innerPadding)
-//                    )
-//                }
-//            }
-//
-//            Box(
-//                modifier = Modifier.fillMaxSize(),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                Text("Fitness Coach App Running ")
-//            }
-//        }
-
-//        setContent {
-//            MaterialTheme {
-//
-//                Scaffold(
-//                    topBar = {
-//                        TopAppBar(
-//                            title = { Text("Fitness Coach") }
-//                        )
-//                    }
-//                ) { padding ->
-//
-//                    Column(
-//                        modifier = Modifier
-//                            .fillMaxSize()
-//                            .padding(padding)
-//                            .padding(16.dp),
-//                        verticalArrangement = Arrangement.spacedBy(16.dp)
-//                    ) {
-//
-//                        Card(
-//                            modifier = Modifier.fillMaxWidth(),
-//                            elevation = CardDefaults.cardElevation(6.dp)
-//                        ) {
-//                            Column(
-//                                modifier = Modifier.padding(16.dp)
-//                            ) {
-//                                Text(
-//                                    text = "Today's Workout",
-//                                    style = MaterialTheme.typography.titleLarge
-//                                )
-//                                Spacer(modifier = Modifier.height(8.dp))
-//                                Text("Push-ups • Squats • Plank")
-//                            }
-//                        }
-//
-//                        Button(
-//                            onClick = { },
-////                            modifier = Modifier.fillMaxWidth()
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .height(56.dp)
-//                        ) {
-//                            Text("Start Training")
-//                        }
-//
-//                        OutlinedButton(
-//                            onClick = { },
-//                            modifier = Modifier.fillMaxWidth()
-//                        ) {
-//                            Text("View Records")
-//                        }
-//                    }
-//                }
-//            }
-//        }
-
         setContent {
             FitnessCoachTheme {
                 // 1. 创建控制中心
                 val navController = rememberNavController()
+                val userViewModel: UserViewModel = viewModel()
 
                 // 2 使用 Scaffold 来管理布局（方便后续加底部栏）
                 Scaffold(
@@ -108,6 +36,7 @@ class MainActivity : ComponentActivity() {
                     // 核心：把 Padding 传递给 NavGraph，避免内容被底部栏遮挡
                     AppNavGraph(
                         navController = navController,
+                        userViewModel = userViewModel,
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
