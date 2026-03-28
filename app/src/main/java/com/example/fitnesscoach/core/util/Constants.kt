@@ -23,4 +23,8 @@ object Constants {
     // Module 1: Skeleton normalisation
     // Acceptable error tolerance for acceptance-criteria checks
     const val NORMALISE_EPSILON = 0.001f
+
+    // Module 2: OE-DTW real-time alignment
+    // Minimum user sequence length before alignment is considered stable
+    const val OE_DTW_MIN_FRAMES = 20
 }

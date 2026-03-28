@@ -88,5 +88,5 @@ Do not edit files outside your assigned module without coordinating with the own
 
 ### Sprint 1 — Pending / Sprint 1 待完成
 
-- [ ] Skeleton normalisation function — Kotlin implementation + unit tests / 骨架归一化函数（Kotlin实现，含单元测试）
-- [ ] OE-DTW core logic — Kotlin implementation + unit tests / OE-DTW核心逻辑（Kotlin实现，含单元测试）
+- [x] Skeleton normalisation function — Kotlin implementation + unit tests / 骨架归一化函数（Kotlin实现，含单元测试）
+- [x] OE-DTW core logic — Kotlin implementation + unit tests / OE-DTW核心逻辑（Kotlin实现，含单元测试）
