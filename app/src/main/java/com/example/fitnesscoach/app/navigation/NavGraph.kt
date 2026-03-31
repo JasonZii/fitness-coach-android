@@ -36,8 +36,11 @@ fun AppNavGraph(
             HomeScreen(navController)
         }
         composable(Routes.USER) {
-//            UserScreen(navController)
-            LoginScreen(navController, userViewModel)
+            if (userViewModel.isLoggedIn) {
+                ProfileScreen(navController, userViewModel)
+            } else {
+                LoginScreen(navController, userViewModel)
+            }
         }
         composable(Routes.TRAINING) {
             TrainingScreen(navController)

@@ -12,6 +12,13 @@ import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.user.viewmodel.UserViewModel
 
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import com.example.fitnesscoach.data.local.UserPreferencesManager
+import androidx.compose.runtime.remember
+
 @Composable
 fun ProfileScreen(
     navController: NavHostController,
@@ -51,13 +58,13 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            TextButton(onClick = { }) {
-                Text("Edit")
-            }
-
-            TextButton(onClick = { }) {
-                Text("Delete")
-            }
+//            TextButton(onClick = { }) {
+//                Text("Edit")
+//            }
+//
+//            TextButton(onClick = { }) {
+//                Text("Delete")
+//            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -67,6 +74,29 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Home")
+        }
+
+        val context = LocalContext.current
+        val userPrefs = remember { UserPreferencesManager(context) }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = {
+                userViewModel.logout()
+
+                CoroutineScope(Dispatchers.IO).launch {
+                    userPrefs.saveLoginStatus(false)
+                }
+
+                navController.navigate(Routes.USER) {
+                    popUpTo(Routes.USER) { inclusive = true }
+                    launchSingleTop = true
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Log Out")
         }
     }
 }

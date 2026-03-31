@@ -62,6 +62,9 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     implementation("androidx.compose.material:material-icons-extended")
+    //datastore
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler) // 必须使用 kapt，这也是为什么要加 kotlin-kapt 插件的原因

@@ -17,6 +17,9 @@ import com.example.fitnesscoach.app.navigation.FitnessBottomBar
 import com.example.fitnesscoach.ui.theme.FitnessCoachTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fitnesscoach.user.viewmodel.UserViewModel
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.example.fitnesscoach.data.local.UserPreferencesManager
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
@@ -27,6 +30,22 @@ class MainActivity : ComponentActivity() {
                 // 1. 创建控制中心
                 val navController = rememberNavController()
                 val userViewModel: UserViewModel = viewModel()
+                val context = LocalContext.current
+                val userPrefs = UserPreferencesManager(context)
+
+                LaunchedEffect(Unit) {
+                    val user = userPrefs.getUser()
+                    val isLoggedIn = userPrefs.getLoginStatus()
+
+                    userViewModel.loadUser(
+                        username = user["username"] ?: "",
+                        password = user["password"] ?: "",
+                        email = user["email"] ?: "",
+                        height = user["height"] ?: "",
+                        weight = user["weight"] ?: ""
+                    )
+                    userViewModel.isLoggedIn = isLoggedIn
+                }
 
                 // 2 使用 Scaffold 来管理布局（方便后续加底部栏）
                 Scaffold(

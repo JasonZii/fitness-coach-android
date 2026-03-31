@@ -11,6 +11,13 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.user.viewmodel.UserViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import com.example.fitnesscoach.data.local.UserPreferencesManager
+import androidx.compose.runtime.remember
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 
 @Composable
 fun RegisterScreen(navController: NavHostController, userViewModel: UserViewModel) {
@@ -21,6 +28,10 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
     var email by remember { mutableStateOf("") }
     var height by remember { mutableStateOf("") }
     var weight by remember { mutableStateOf("") }
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val userPrefs = remember { UserPreferencesManager(context) }
 
     Column(
         modifier = Modifier
@@ -59,7 +70,9 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -69,7 +82,9 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
         OutlinedTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -124,14 +139,70 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
 
             Button(
                 onClick = {
-                    userViewModel.registerUser(
-                        username = username,
-                        password = password,
-                        email = email,
-                        height = height,
-                        weight = weight
-                    )
-                    navController.navigate(Routes.PROFILE)
+                    when {
+                        username.isBlank() -> {
+                            errorMessage = "Username cannot be empty."
+                            showErrorDialog = true
+                        }
+
+                        password.isBlank() -> {
+                            errorMessage = "Password cannot be empty."
+                            showErrorDialog = true
+                        }
+
+                        confirmPassword.isBlank() -> {
+                            errorMessage = "Please confirm your password."
+                            showErrorDialog = true
+                        }
+
+                        password != confirmPassword -> {
+                            errorMessage = "Passwords do not match."
+                            showErrorDialog = true
+                        }
+
+                        email.isBlank() -> {
+                            errorMessage = "Email cannot be empty."
+                            showErrorDialog = true
+                        }
+
+                        height.isBlank() -> {
+                            errorMessage = "Height cannot be empty."
+                            showErrorDialog = true
+                        }
+
+                        weight.isBlank() -> {
+                            errorMessage = "Weight cannot be empty."
+                            showErrorDialog = true
+                        }
+
+                        userViewModel.isUsernameTaken(username) -> {
+                            errorMessage = "This username already exists."
+                            showErrorDialog = true
+                        }
+
+                        else -> {
+                            userViewModel.registerUser(
+                                username = username,
+                                password = password,
+                                email = email,
+                                height = height,
+                                weight = weight
+                            )
+
+                            CoroutineScope(Dispatchers.IO).launch {
+                                userPrefs.saveUser(
+                                    username = username,
+                                    password = password,
+                                    email = email,
+                                    height = height,
+                                    weight = weight
+                                )
+                                userPrefs.saveLoginStatus(true)
+                            }
+
+                            navController.navigate(Routes.USER)
+                        }
+                    }
                 },
                 modifier = Modifier.weight(1f)
             ) {
@@ -140,5 +211,22 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            confirmButton = {
+                TextButton(onClick = { showErrorDialog = false }) {
+                    Text("OK")
+                }
+            },
+            title = {
+                Text("Registration Error")
+            },
+            text = {
+                Text(errorMessage)
+            }
+        )
     }
 }

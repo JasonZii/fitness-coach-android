@@ -13,6 +13,7 @@ class UserViewModel : ViewModel() {
     var email by mutableStateOf("")
     var height by mutableStateOf("")
     var weight by mutableStateOf("")
+    var isLoggedIn by mutableStateOf(false)
 
     //username = jason
     //password = 123
@@ -32,11 +33,34 @@ class UserViewModel : ViewModel() {
         this.email = email
         this.height = height
         this.weight = weight
+        this.isLoggedIn = true
     }
 
-    //检查登录输入的账号密码对不对
+    fun loadUser(
+        username: String,
+        password: String,
+        email: String,
+        height: String,
+        weight: String
+    ) {
+        this.username = username
+        this.password = password
+        this.email = email
+        this.height = height
+        this.weight = weight
+        this.isLoggedIn = username.isNotBlank()
+    }
+
     fun login(inputUsername: String, inputPassword: String): Boolean {
-        return username == inputUsername && password == inputPassword
+        val success = username == inputUsername && password == inputPassword
+        if (success) {
+            isLoggedIn = true
+        }
+        return success
+    }
+
+    fun logout() {
+        isLoggedIn = false
     }
 
     //清空用户信息
@@ -46,5 +70,10 @@ class UserViewModel : ViewModel() {
         email = ""
         height = ""
         weight = ""
+        isLoggedIn = false
+    }
+
+    fun isUsernameTaken(inputUsername: String): Boolean {
+        return username.isNotBlank() && username == inputUsername
     }
 }
