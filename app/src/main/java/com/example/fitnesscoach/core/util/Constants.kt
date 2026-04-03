@@ -19,6 +19,8 @@ object Constants {
 
     // Total number of MediaPipe BlazePose landmarks per frame
     const val LANDMARK_COUNT = 33
+    // Total number of limb connections used for skeleton overlay and scoring
+    const val LIMB_COUNT = 13
 
     // Module 1: Skeleton normalisation
     // Acceptable error tolerance for acceptance-criteria checks
