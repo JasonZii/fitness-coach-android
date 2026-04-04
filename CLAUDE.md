@@ -78,15 +78,14 @@ Do not edit files outside your assigned module without coordinating with the own
 
 ## Current Progress
 
-### Completed today (2026-03-24) / 今日已完成
+### Sprint 1 — 已完成 / Completed
+- [x] 文档初始化（ALGORITHM.md, PRD.md, RULES.md, README.md, CLAUDE.md）
+- [x] CSIT998-5: 骨架归一化函数 — 已完成，6个单元测试通过
+- [x] CSIT998-6: OE-DTW实时对齐函数 — 已完成，13个单元测试通过
 
-- [x] `ALGORITHM.md` — full interface contracts for all algorithm modules / 算法模块完整接口约定
-- [x] `PRD.md` — product requirements document / 产品需求文档
-- [x] `RULES.md` — coding conventions / 编码规范
-- [x] `README.md` — project overview and module description / 项目概述和模块说明
-- [x] `CLAUDE.md` — Claude Code configuration / Claude Code 配置文件
-
-### Sprint 1 — Pending / Sprint 1 待完成
-
-- [x] Skeleton normalisation function — Kotlin implementation + unit tests / 骨架归一化函数（Kotlin实现，含单元测试）
-- [x] OE-DTW core logic — Kotlin implementation + unit tests / OE-DTW核心逻辑（Kotlin实现，含单元测试）
+### Sprint 2 — 进行中 / In Progress
+- [x] CSIT998-15: 骨架叠加层绘制（关节点+连线）— 已完成，15个单元测试通过
+- [x] CSIT998-16: 关节颜色逻辑实现 — 已完成，29个单元测试通过
+- [ ] CSIT998-19: 准备检测：全身入画检测
+- [ ] CSIT998-20: 准备检测：角度检测（正面/侧面）
+- [ ] CSIT998-24: 倒计时提示逻辑

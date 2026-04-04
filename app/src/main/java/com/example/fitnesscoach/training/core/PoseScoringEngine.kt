@@ -1,6 +1,11 @@
 package com.example.fitnesscoach.training.core
 
 import androidx.compose.ui.graphics.Color
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
+import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
+import com.example.fitnesscoach.core.util.Constants.SCORE_RED_THRESHOLD
+import com.example.fitnesscoach.core.util.Constants.SCORE_WEIGHT_S1
+import com.example.fitnesscoach.core.util.Constants.SCORE_WEIGHT_S2
 import kotlin.math.acos
 import kotlin.math.sqrt
 
@@ -28,14 +33,6 @@ data class PoseScoreResult(
 )
 
 object PoseScoringEngine {
-    //表示 MediaPipe Pose 的关键点数是 33 个。
-    private const val JOINT_COUNT = 33
-    //表示你当前定义了 13 条肢体。
-    private const val LIMB_COUNT = 13
-    //颜色判断阈值：
-    //小于 80 → 红色
-    //大于等于 80 → 绿色
-    private const val THRESHOLD = 80f
     //用来避免除以 0。
     private const val EPS = 1e-6f
 
@@ -80,12 +77,12 @@ object PoseScoringEngine {
         referenceLandmarks: List<Pair<Float, Float>>  //参考标准帧的 33 个关键点
     ): PoseScoreResult {
         //校验
-        require(userLandmarks.size == JOINT_COUNT) {
-            "userLandmarks size must be 33"
+        require(userLandmarks.size == LANDMARK_COUNT) {
+            "userLandmarks size must be $LANDMARK_COUNT"
         }
         //校验
-        require(referenceLandmarks.size == JOINT_COUNT) {
-            "referenceLandmarks size must be 33"
+        require(referenceLandmarks.size == LANDMARK_COUNT) {
+            "referenceLandmarks size must be $LANDMARK_COUNT"
         }
 
         //把 Pair 转成 Point
@@ -95,12 +92,12 @@ object PoseScoringEngine {
         // 计算关节得分, 先算欧氏距离 dp = sqrt((x1-x2)^2 + (y1-y2)^2) 也就是用户点和参考点之间的距离。
         // 再转成分数 距离越小 → 分数越高, 距离越大 → 分数越低
         // Step 1: joint scores
-        val jointScores = (0 until JOINT_COUNT).map { p ->
+        val jointScores = (0 until LANDMARK_COUNT).map { p ->
             val dp = distance(user[p], ref[p])
             ((1f - dp) * 100f).coerceIn(0f, 100f)  //把分数强制限制在 0~100 范围内
         }
 
-        //把 33 个关节分数求平均。
+        //把 LANDMARK_COUNT 个关节分数求平均。
         val s1 = jointScores.average().toFloat()
 
         // Step 2: limb angle scores
@@ -115,18 +112,16 @@ object PoseScoringEngine {
         //肢体平均分,13 条 limb 的平均分
         val s2 = limbScores.average().toFloat()
 
-        // Step 3: overall score  综合分 sf = 0.2 * s1 + 0.8 * s2
-        val sf = (0.2f * s1 + 0.8f * s2).coerceIn(0f, 100f)
+        // Step 3: overall score  综合分 sf = SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2
+        val sf = (SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2).coerceIn(0f, 100f)
 
-        // Step 4: colors
-        //关节颜色如果某个关节分数小于 80：红色 否则：绿色
+        // Step 4: colors — SCORE_RED_THRESHOLD (80) is the threshold from ALGORITHM.md §Module 3
         val jointColors = jointScores.map { score ->
-            if (score < THRESHOLD) RED else GREEN
+            if (score < SCORE_RED_THRESHOLD) RED else GREEN
         }
 
-        //肢体颜色
         val limbColors = limbScores.map { score ->
-            if (score < THRESHOLD) RED else GREEN
+            if (score < SCORE_RED_THRESHOLD) RED else GREEN
         }
 
         //返回最终结果
