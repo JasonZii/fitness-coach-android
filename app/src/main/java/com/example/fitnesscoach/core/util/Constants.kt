@@ -29,4 +29,12 @@ object Constants {
     // Module 2: OE-DTW real-time alignment
     // Minimum user sequence length before alignment is considered stable
     const val OE_DTW_MIN_FRAMES = 20
+
+    // Module 3: Per-landmark scoring
+    // Joint/limb score below this threshold → RED; at or above → GREEN
+    const val SCORE_RED_THRESHOLD = 80f
+    // Weight of joint-position score S1 in the overall frame score Sf
+    const val SCORE_WEIGHT_S1 = 0.2f
+    // Weight of limb-angle score S2 in the overall frame score Sf
+    const val SCORE_WEIGHT_S2 = 0.8f
 }
