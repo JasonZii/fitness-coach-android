@@ -40,7 +40,7 @@ fun AppNavGraph(
             LoginScreen(navController, userViewModel)
         }
         composable(Routes.TRAINING) {
-            TrainingScreen(navController)
+            TrainingScreen()
         }
         composable(Routes.RECORD) {
             RecordScreen(navController)
