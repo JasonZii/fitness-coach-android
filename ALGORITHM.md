@@ -511,6 +511,18 @@ Check visibility score of these landmarks, all must be > 0.5:
 左膝(25)、右膝(26)、左踝(27)、右踝(28)
 ```
 
+接口约定（Member B / Lee 负责调用）：
+MediaPipe的可见度分数不在Triple坐标里，需要单独提取后传入isFullBodyInFrame。
+提取方式如下：
+
+Interface convention (called by Member B / Lee):
+MediaPipe visibility is not stored in the (x, y, z) Triple.
+It must be extracted separately before calling isFullBodyInFrame:
+```kotlin
+val visibilities = poseLandmarks.map { it.inFrameLikelihood() }
+isFullBodyInFrame(visibilities)
+```
+
 触发训练开始 / Training start trigger:
 两个条件同时满足并持续3秒 -> 显示倒计时3、2、1 -> 训练开始
 Both conditions satisfied for 3 seconds -> countdown 3,2,1 -> training starts
