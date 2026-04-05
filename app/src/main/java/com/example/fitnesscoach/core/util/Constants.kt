@@ -37,4 +37,22 @@ object Constants {
     const val SCORE_WEIGHT_S1 = 0.2f
     // Weight of limb-angle score S2 in the overall frame score Sf
     const val SCORE_WEIGHT_S2 = 0.8f
+
+    // Module 5: Camera readiness detection
+    // Minimum per-landmark visibility score for full-body-in-frame check
+    const val VISIBILITY_IN_FRAME_MIN = 0.5f
+    // theta (nose–shoulder–shoulder angle) above this value → front view
+    const val CAMERA_ANGLE_FRONT_MIN = 150f
+    // theta below this value → side view
+    const val CAMERA_ANGLE_SIDE_MAX = 60f
+    // Both readiness conditions must hold this many seconds before countdown
+    const val READINESS_HOLD_SECONDS = 3
+
+    // Module 6: Training end detection
+    // Average visibility of key landmarks below this triggers pause
+    const val END_VISIBILITY_THRESHOLD = 0.3f
+    // Seconds below threshold required to confirm training end
+    const val END_VISIBILITY_HOLD_SECONDS = 3
+    // Shoulder-width ratio multiplier to detect user walking toward camera
+    const val END_SHOULDER_WIDTH_RATIO = 1.5f
 }
