@@ -43,7 +43,7 @@ fun AppNavGraph(
             }
         }
         composable(Routes.TRAINING) {
-            TrainingScreen(navController)
+            TrainingScreen()
         }
         composable(Routes.RECORD) {
             RecordScreen(navController)
