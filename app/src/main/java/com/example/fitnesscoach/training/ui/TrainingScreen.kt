@@ -10,9 +10,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.NavHostController
 
 @Composable
-fun TrainingScreen() {
+fun TrainingScreen(navController: NavHostController) {
     val context = LocalContext.current
     var landmarkCount by remember { mutableStateOf(0) }
 
