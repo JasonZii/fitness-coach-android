@@ -51,6 +51,7 @@ fun CameraPreview(
 
                         frameProcessor.processFrame(
                             imageProxy = imageProxy,
+                            timestampMs = System.currentTimeMillis(),
                             onResult = { poseResult ->
                                 onPoseDetected(poseResult)
                             }
