@@ -12,34 +12,29 @@ import androidx.camera.core.ImageProxy
 import com.example.fitnesscoach.core.mediapipe.PoseLandmarkerHelper
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.atomic.AtomicBoolean
 
 class PoseFrameProcessor(context: Context) {
 
     private val appContext = context.applicationContext
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
-    private val isProcessing = AtomicBoolean(false)
+    private var onResultListener: ((PoseResult) -> Unit)? = null
 
     fun processFrame(
         imageProxy: ImageProxy,
+        timestampMs: Long,
         onResult: (PoseResult) -> Unit
     ) {
-        if (!isProcessing.compareAndSet(false, true)) {
-            imageProxy.close()
-            return
-        }
-
         try {
+            onResultListener = onResult
+
             if (poseLandmarkerHelper == null) {
-                poseLandmarkerHelper = PoseLandmarkerHelper(appContext)
+                poseLandmarkerHelper = PoseLandmarkerHelper(appContext) { result ->
+                    onResultListener?.invoke(result)
+                }
             }
 
             val bitmap = imageProxyToBitmap(imageProxy)
-            val result = poseLandmarkerHelper?.detect(bitmap) ?: PoseResult(
-                landmarks = emptyList(),
-                visibilities = emptyList()
-            )
-            onResult(result)
+            poseLandmarkerHelper?.detectAsync(bitmap, timestampMs)
         } catch (e: Exception) {
             Log.e("POSE", "Processing failed", e)
             onResult(
@@ -50,7 +45,6 @@ class PoseFrameProcessor(context: Context) {
             )
         } finally {
             imageProxy.close()
-            isProcessing.set(false)
         }
     }
 
