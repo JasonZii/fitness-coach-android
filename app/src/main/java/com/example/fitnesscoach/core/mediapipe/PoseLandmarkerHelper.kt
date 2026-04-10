@@ -31,7 +31,7 @@ class PoseLandmarkerHelper(context: Context) {
         Log.d("POSE", "PoseLandmarker initialized")
     }
 
-    fun detect(bitmap: Bitmap): List<Triple<Float, Float, Float>> {
+    fun detect(bitmap: Bitmap): PoseResult {
         return try {
             val mpImage = BitmapImageBuilder(bitmap).build()
             val result = poseLandmarker.detect(mpImage)
@@ -39,22 +39,33 @@ class PoseLandmarkerHelper(context: Context) {
             val landmarks = result.landmarks()
             if (landmarks.isEmpty()) {
                 Log.d("POSE", "Landmarks count: 0")
-                emptyList()
+                PoseResult(
+                    landmarks = emptyList(),
+                    visibilities = emptyList()
+                )
             } else {
                 val firstPose = landmarks[0]
                 Log.d("POSE", "Landmarks count: ${firstPose.size}")
 
-                firstPose.map { landmark ->
-                    Triple(
-                        landmark.x(),
-                        landmark.y(),
-                        landmark.z()
-                    )
-                }
+                PoseResult(
+                    landmarks = firstPose.map { landmark ->
+                        Triple(
+                            landmark.x(),
+                            landmark.y(),
+                            landmark.z()
+                        )
+                    },
+                    visibilities = firstPose.map { landmark ->
+                        landmark.visibility().orElse(0f)
+                    }
+                )
             }
         } catch (e: Exception) {
             Log.e("POSE", "Pose detection failed", e)
-            emptyList()
+            PoseResult(
+                landmarks = emptyList(),
+                visibilities = emptyList()
+            )
         }
     }
 

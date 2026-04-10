@@ -10,6 +10,7 @@ import android.graphics.YuvImage
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.example.fitnesscoach.core.mediapipe.PoseLandmarkerHelper
+import com.example.fitnesscoach.core.mediapipe.PoseResult
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -21,7 +22,7 @@ class PoseFrameProcessor(context: Context) {
 
     fun processFrame(
         imageProxy: ImageProxy,
-        onResult: (List<Triple<Float, Float, Float>>) -> Unit
+        onResult: (PoseResult) -> Unit
     ) {
         if (!isProcessing.compareAndSet(false, true)) {
             imageProxy.close()
@@ -34,11 +35,19 @@ class PoseFrameProcessor(context: Context) {
             }
 
             val bitmap = imageProxyToBitmap(imageProxy)
-            val result = poseLandmarkerHelper?.detect(bitmap) ?: emptyList()
+            val result = poseLandmarkerHelper?.detect(bitmap) ?: PoseResult(
+                landmarks = emptyList(),
+                visibilities = emptyList()
+            )
             onResult(result)
         } catch (e: Exception) {
             Log.e("POSE", "Processing failed", e)
-            onResult(emptyList())
+            onResult(
+                PoseResult(
+                    landmarks = emptyList(),
+                    visibilities = emptyList()
+                )
+            )
         } finally {
             imageProxy.close()
             isProcessing.set(false)

@@ -11,24 +11,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import com.example.fitnesscoach.core.mediapipe.PoseResult
 
 @Composable
 fun TrainingScreen(navController: NavHostController) {
     val context = LocalContext.current
     var landmarkCount by remember { mutableStateOf(0) }
+    var latestPoseResult by remember {
+        mutableStateOf(
+            PoseResult(
+                landmarks = emptyList(),
+                visibilities = emptyList()
+            )
+        )
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
 
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
             context = context,
-            onLandmarksDetected = { count ->
-                landmarkCount = count
+            onPoseDetected = { poseResult ->
+                latestPoseResult = poseResult
+                landmarkCount = poseResult.landmarks.size
             }
         )
 
         Text(
-            text = "Landmarks detected: $landmarkCount",
+            text = "Landmarks detected: $landmarkCount, visibilities: ${latestPoseResult.visibilities.size}",
             color = Color.White,
             modifier = Modifier
                 .align(Alignment.TopCenter)

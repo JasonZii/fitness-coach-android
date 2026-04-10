@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.fitnesscoach.core.camera.CameraController
+import com.example.fitnesscoach.core.mediapipe.PoseResult
 import com.example.fitnesscoach.training.pose.PoseFrameProcessor
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -16,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 fun CameraPreview(
     modifier: Modifier = Modifier,
     context: Context,
-    onLandmarksDetected: (Int) -> Unit = {}
+    onPoseDetected: (PoseResult) -> Unit = {}
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraController = remember { CameraController(context) }
@@ -43,15 +44,15 @@ fun CameraPreview(
                     onFrameAvailable = { imageProxy ->
                         val currentFrame = frameCounter.incrementAndGet()
 
-                        if (currentFrame % 45 != 0) {
+                        if (currentFrame % 3 != 0) {
                             imageProxy.close()
                             return@startCamera
                         }
 
                         frameProcessor.processFrame(
                             imageProxy = imageProxy,
-                            onResult = { landmarks ->
-                                onLandmarksDetected(landmarks.size)
+                            onResult = { poseResult ->
+                                onPoseDetected(poseResult)
                             }
                         )
                     }
