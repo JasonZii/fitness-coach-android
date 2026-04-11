@@ -44,6 +44,13 @@ android {
     buildFeatures {
         compose = true
     }
+
+    sourceSets {
+        getByName("test") {
+            // Make assets/ available to unit tests via ClassLoader.getResourceAsStream()
+            resources.srcDirs("src/main/assets")
+        }
+    }
 }
 
 dependencies {
@@ -58,6 +65,8 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 
     testImplementation(libs.junit)
+    // Standalone org.json for unit tests (production uses Android platform's built-in org.json)
+    testImplementation("org.json:json:20231013")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -73,6 +82,9 @@ dependencies {
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
+
+    // ViewModel + viewModelScope
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
 
     // CameraX
     implementation("androidx.camera:camera-camera2:1.3.4")
