@@ -48,6 +48,22 @@ object Constants {
     // Both readiness conditions must hold this many seconds before countdown
     const val READINESS_HOLD_SECONDS = 3
 
+    // State machine thresholds — Squat / Lunge (ALGORITHM.md Module 4)
+    const val SQUAT_S1_ANGLE = 160f   // standing straight; angle > this → S1
+    const val SQUAT_S3_ANGLE = 90f    // fully squatted;   angle < this → S3
+
+    // State machine thresholds — Bicep Curl
+    const val BICEP_CURL_S1_ANGLE = 160f
+    const val BICEP_CURL_S3_ANGLE = 50f
+
+    // State machine thresholds — Shoulder Press
+    const val SHOULDER_PRESS_S1_ANGLE = 90f
+    const val SHOULDER_PRESS_S3_ANGLE = 160f
+
+    // State machine thresholds — Lateral Raise
+    const val LATERAL_RAISE_S1_ANGLE = 30f
+    const val LATERAL_RAISE_S3_ANGLE = 80f
+
     // Module 6: Training end detection
     // Average visibility of key landmarks below this triggers pause
     const val END_VISIBILITY_THRESHOLD = 0.3f

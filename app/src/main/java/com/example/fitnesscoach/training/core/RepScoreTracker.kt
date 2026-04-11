@@ -18,4 +18,13 @@ class RepScoreTracker {
     }
 
     fun getCompletedRepScores(): List<Float> = completedRepScores.toList()
+
+    /**
+     * Discards the in-progress rep's accumulated frame scores without recording a rep.
+     * Call when training is interrupted (Module 6 pause) so a partial rep is not
+     * included in the session summary.
+     */
+    fun discardCurrentRep() {
+        currentRepFrameScores.clear()
+    }
 }
