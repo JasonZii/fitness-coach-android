@@ -14,7 +14,10 @@ import androidx.navigation.NavHostController
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 
 @Composable
-fun TrainingScreen(navController: NavHostController) {
+fun TrainingScreen(
+    navController: NavHostController,
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     var landmarkCount by remember { mutableStateOf(0) }
     var latestPoseResult by remember {
@@ -26,8 +29,9 @@ fun TrainingScreen(navController: NavHostController) {
         )
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
         CameraPreview(
             modifier = Modifier.fillMaxSize(),
             context = context,

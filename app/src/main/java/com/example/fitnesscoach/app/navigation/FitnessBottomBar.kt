@@ -12,34 +12,11 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 
+// 画UI + 点击逻辑
 @Composable
 fun FitnessBottomBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-
-//    NavigationBar(
-//        containerColor = MaterialTheme.colorScheme.surface,
-//        tonalElevation = 8.dp
-//    ) {
-//        bottomNavItems.forEach { item ->
-//            NavigationBarItem(
-//                icon = { Icon(item.icon, contentDescription = item.title) },
-//                label = { Text(item.title) },
-//                selected = currentRoute == item.route,
-//                onClick = {
-//                    navController.navigate(item.route) {
-//                        // 避免在栈中堆积重复页面
-//                        popUpTo(navController.graph.findStartDestination().id) {
-//                            saveState = true
-//                        }
-//                        launchSingleTop = true
-//                        restoreState = true
-//                    }
-//                }
-//            )
-//        }
-//    }
-
 
     NavigationBar {
         bottomNavItems.forEach { item ->
