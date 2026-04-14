@@ -20,6 +20,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // MediaPipe tasks-vision does not ship libmediapipe_tasks_vision_jni.so for x86_64.
+            // Restrict app packaging to ABIs the dependency actually provides.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86")
+        }
     }
 
     buildTypes {
