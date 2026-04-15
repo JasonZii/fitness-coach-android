@@ -48,21 +48,29 @@ object Constants {
     // Both readiness conditions must hold this many seconds before countdown
     const val READINESS_HOLD_SECONDS = 3
 
-    // State machine thresholds — Squat / Lunge (ALGORITHM.md Module 4)
-    const val SQUAT_S1_ANGLE = 160f   // standing straight; angle > this → S1
-    const val SQUAT_S3_ANGLE = 90f    // fully squatted;   angle < this → S3
+    // State machine thresholds — Squat (squat, ALGORITHM.md Module 4)
+    const val SQUAT_S1_ANGLE = 160f   // standing straight;    angle ≥ this → S1 territory
+    const val SQUAT_S3_ANGLE = 90f    // fully squatted;       angle ≤ this → S3 territory
 
-    // State machine thresholds — Bicep Curl
-    const val BICEP_CURL_S1_ANGLE = 160f
-    const val BICEP_CURL_S3_ANGLE = 50f
+    // State machine thresholds — Right Leg Lunge to Knee Raise (right_leg_lunge_to_knee_raise)
+    const val LUNGE_S1_ANGLE = 160f   // standing straight;    angle ≥ this → S1 territory
+    const val LUNGE_S3_ANGLE = 90f    // lunge bottom;         angle ≤ this → S3 territory
 
-    // State machine thresholds — Shoulder Press
-    const val SHOULDER_PRESS_S1_ANGLE = 90f
-    const val SHOULDER_PRESS_S3_ANGLE = 160f
+    // State machine thresholds — Bicep Curl (bicep_curl)
+    const val BICEP_CURL_S1_ANGLE = 160f   // arm fully extended;  angle ≥ this → S1 territory
+    const val BICEP_CURL_S3_ANGLE = 50f    // curl peak;           angle ≤ this → S3 territory
 
-    // State machine thresholds — Lateral Raise
-    const val LATERAL_RAISE_S1_ANGLE = 30f
-    const val LATERAL_RAISE_S3_ANGLE = 80f
+    // State machine thresholds — Standing Dumbbell Shoulder Press (standing_dumbbell_shoulder_press)
+    const val SHOULDER_PRESS_S1_ANGLE = 90f    // arms at shoulder height; angle ≤ this → S1 territory
+    const val SHOULDER_PRESS_S3_ANGLE = 160f   // fully pressed overhead;  angle ≥ this → S3 territory
+
+    // State machine thresholds — Dumbbell Lateral Raise (dumbbell_lateral_raise)
+    const val LATERAL_RAISE_S1_ANGLE = 30f   // arm at side;            angle ≤ this → S1 territory
+    const val LATERAL_RAISE_S3_ANGLE = 80f   // arm raised to shoulder; angle ≥ this → S3 territory
+
+    // Module 4: Rep correctness classification
+    // A rep is CORRECT when the longest consecutive-red-frame run is ≤ this value (~0.25 s at 20 fps)
+    const val MAX_CONSECUTIVE_RED_FRAMES = 5
 
     // Module 6: Training end detection
     // Average visibility of key landmarks below this triggers pause

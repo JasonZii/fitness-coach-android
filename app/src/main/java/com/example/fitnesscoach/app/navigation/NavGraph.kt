@@ -9,6 +9,7 @@ import com.example.fitnesscoach.exercise.ui.ExerciseDetailScreen
 import com.example.fitnesscoach.exercise.ui.ExerciseLibraryScreen
 import com.example.fitnesscoach.record.ui.RecordScreen
 import com.example.fitnesscoach.home.ui.HomeScreen
+import com.example.fitnesscoach.training.ui.ResultScreen
 import com.example.fitnesscoach.training.ui.TrainingScreen
 import com.example.fitnesscoach.user.ui.LoginScreen
 import com.example.fitnesscoach.user.ui.RegisterScreen
@@ -22,18 +23,40 @@ import com.example.fitnesscoach.record.ui.RecordDetailScreen
 object Routes {
     const val HOME = "home"
     const val USER = "user"
-    const val TRAINING = "training"
     const val RECORD = "record"
 
     const val REGISTER = "register"
     const val PROFILE = "profile"
 
     const val EXERCISE_LIBRARY = "exercise_library"
-    const val EXERCISE_DETAIL = "exercise_detail"
+    /** Route template registered in NavHost for exercise detail. */
+    const val EXERCISE_DETAIL_TEMPLATE = "exercise_detail/{exerciseId}"
+
+    /** Navigate to the detail screen for [exerciseId]. */
+    fun exerciseDetail(exerciseId: String) = "exercise_detail/$exerciseId"
 
     const val RECORD_LIST = "record_list"
     const val RECORD_DETAIL = "record_detail"
 
+    // ── Training routes ───────────────────────────────────────────────────────
+
+    /** Route template registered in NavHost. Used for bottom-bar hiding checks. */
+    const val TRAINING_TEMPLATE = "training/{exerciseId}"
+    /** Route template for the post-training result screen. */
+    const val TRAINING_RESULT_TEMPLATE =
+        "training_result/{exerciseId}/{repCount}/{avgScore}/{correctReps}/{incorrectReps}"
+
+    /** Navigate to the training screen for [exerciseId]. */
+    fun training(exerciseId: String) = "training/$exerciseId"
+
+    /** Navigate to the training result screen. [avgScore] is rounded to an Int. */
+    fun trainingResult(
+        exerciseId: String,
+        repCount: Int,
+        avgScore: Int,
+        correctReps: Int,
+        incorrectReps: Int,
+    ) = "training_result/$exerciseId/$repCount/$avgScore/$correctReps/$incorrectReps"
 }
 
 @Composable
@@ -56,10 +79,27 @@ fun AppNavGraph(
                 LoginScreen(navController, userViewModel)
             }
         }
-        composable(Routes.TRAINING) {
+        composable(Routes.TRAINING_TEMPLATE) { backStackEntry ->
+            val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
             TrainingScreen(
                 navController = navController,
-                modifier = modifier
+                exerciseId    = exerciseId,
+                modifier      = modifier
+            )
+        }
+        composable(Routes.TRAINING_RESULT_TEMPLATE) { backStackEntry ->
+            val exerciseId    = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
+            val repCount      = backStackEntry.arguments?.getString("repCount")?.toIntOrNull() ?: 0
+            val avgScore      = backStackEntry.arguments?.getString("avgScore")?.toIntOrNull() ?: 0
+            val correctReps   = backStackEntry.arguments?.getString("correctReps")?.toIntOrNull() ?: 0
+            val incorrectReps = backStackEntry.arguments?.getString("incorrectReps")?.toIntOrNull() ?: 0
+            ResultScreen(
+                navController = navController,
+                exerciseId    = exerciseId,
+                repCount      = repCount,
+                avgScore      = avgScore,
+                correctReps   = correctReps,
+                incorrectReps = incorrectReps,
             )
         }
         composable(Routes.RECORD) {
@@ -74,7 +114,7 @@ fun AppNavGraph(
         composable(Routes.EXERCISE_LIBRARY) {
             ExerciseLibraryScreen(navController)
         }
-        composable("exercise_detail/{exerciseId}") { backStackEntry ->
+        composable(Routes.EXERCISE_DETAIL_TEMPLATE) { backStackEntry ->
             val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: ""
             ExerciseDetailScreen(navController, exerciseId)
         }

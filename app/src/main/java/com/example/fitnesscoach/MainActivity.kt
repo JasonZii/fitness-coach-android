@@ -11,9 +11,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.runtime.getValue
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.fitnesscoach.app.navigation.AppNavGraph
 import com.example.fitnesscoach.app.navigation.FitnessBottomBar
+import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.ui.theme.FitnessCoachTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.fitnesscoach.user.viewmodel.UserViewModel
@@ -47,10 +50,19 @@ class MainActivity : ComponentActivity() {
                     userViewModel.isLoggedIn = isLoggedIn
                 }
 
+                // Hide the bottom bar on full-screen routes (Training, Result, Record Detail)
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
+                val hideBottomBarRoutes = listOf(
+                    Routes.TRAINING_TEMPLATE,
+                    Routes.TRAINING_RESULT_TEMPLATE,
+                    "${Routes.RECORD_DETAIL}/{recordId}"
+                )
+                val showBottomBar = currentRoute !in hideBottomBarRoutes
+
                 // 2 使用 Scaffold 来管理布局（方便后续加底部栏）
                 Scaffold(
-                    // 注入底部栏
-                    bottomBar = { FitnessBottomBar(navController) }
+                    bottomBar = { if (showBottomBar) FitnessBottomBar(navController) }
                 ){ innerPadding ->
                     // 核心：把 Padding 传递给 NavGraph，避免内容被底部栏遮挡
                     AppNavGraph(

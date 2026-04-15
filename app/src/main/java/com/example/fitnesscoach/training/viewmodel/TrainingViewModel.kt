@@ -5,14 +5,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.fitnesscoach.core.mediapipe.PoseResult
+import com.example.fitnesscoach.exercise.data.exerciseList
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ANKLE
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_KNEE
 import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
-import com.example.fitnesscoach.core.util.Constants.SQUAT_S1_ANGLE
-import com.example.fitnesscoach.core.util.Constants.SQUAT_S3_ANGLE
 import com.example.fitnesscoach.training.core.RepScoreTracker
+import com.example.fitnesscoach.training.domain.CountRepsUseCase
 import com.example.fitnesscoach.training.data.loadRawReferenceSequence
 import com.example.fitnesscoach.training.domain.EvaluateExerciseUseCase
 import com.example.fitnesscoach.training.pose.CameraAngle
@@ -32,8 +29,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.acos
-import kotlin.math.sqrt
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -56,7 +51,7 @@ data class TrainingUiState(
     /** Controls which UI section is visible. */
     val phase: SessionPhase = SessionPhase.READINESS,
 
-    /** False until squat.json has been parsed and normalised. */
+    /** False until the exercise reference JSON has been parsed and normalised. */
     val isReferenceLoaded: Boolean = false,
 
     // ── Readiness ─────────────────────────────────────────────────────────────
@@ -66,6 +61,8 @@ data class TrainingUiState(
     val isFullBodyInFrame: Boolean = false,
     /** Camera angle as classified by detectCameraAngle(); shown as a user hint. */
     val cameraAngle: CameraAngle = CameraAngle.AMBIGUOUS,
+    /** Camera angle required by the selected exercise (SIDE for squat/lunge, FRONT otherwise). */
+    val requiredCameraAngle: CameraAngle = CameraAngle.SIDE,
 
     // ── Skeleton overlay (valid in both phases once landmarks arrive) ──────────
     /** Raw MediaPipe (x, y, z) triples passed directly to SkeletonOverlay. */
@@ -94,6 +91,10 @@ data class TrainingUiState(
     val repCount: Int = 0,
     /** Average Sf score for each completed rep (index 0 = first rep). */
     val repScores: List<Float> = emptyList(),
+    /** Reps whose max consecutive red-frame run did not exceed the threshold. */
+    val correctReps: Int = 0,
+    /** Reps whose max consecutive red-frame run exceeded the threshold. */
+    val incorrectReps: Int = 0,
 
     // ── Training interruption (Module 6) ──────────────────────────────────────
     /**
@@ -119,12 +120,8 @@ data class TrainingUiState(
  *                  → userSequence.add → alignOeDtw
  *                  → EvaluateExerciseUseCase (colors + score)
  *                  → RepScoreTracker (per-frame accumulation)
- *                  → rep detection stub  ← replace with CountRepsUseCase
+ *                  → CountRepsUseCase (Module 4, exercise-specific rep detection)
  * ```
- *
- * TODO: Accept an exerciseId parameter so the correct reference JSON and
- *       required camera angle are loaded per exercise instead of being
- *       hardcoded to squat.
  */
 class TrainingViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -137,6 +134,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private val evaluateUseCase  = EvaluateExerciseUseCase()
     private val repScoreTracker  = RepScoreTracker()
     private val endDetector      = TrainingEndDetector()
+    // CountRepsUseCase is exercise-specific; reassigned in loadExercise().
+    private var countRepsUseCase = CountRepsUseCase()
 
     /** Tracks the previous frame's pause state to detect ACTIVE→PAUSED transitions. */
     private var wasTrainingPaused = false
@@ -148,26 +147,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     // ── OE-DTW input: normalised frames since training started ────────────────
     private val userSequence = mutableListOf<List<Pair<Float, Float>>>()
 
-    // ── Stub rep-detection state ───────────────────────────────────────────────
-    // TODO: delete StubRepState and stubRepState once CountRepsUseCase is ready.
-    private enum class StubRepState { STANDING, SQUATTING }
-    private var stubRepState = StubRepState.STANDING
-
-    // ── Init: load reference sequence ─────────────────────────────────────────
-
-    init {
-        // Read squat.json once; derive both raw and normalised sequences.
-        // TODO: replace "squat.json" with the filename derived from exerciseId.
-        viewModelScope.launch(Dispatchers.IO) {
-            val rawSeq = loadRawReferenceSequence(application, "squat.json")
-            val normalizedSeq = rawSeq.map { normalizeLandmarks(it) }
-            withContext(Dispatchers.Main) {
-                rawReferenceSequence = rawSeq
-                referenceSequence    = normalizedSeq
-                _uiState.update { it.copy(isReferenceLoaded = true) }
-            }
-        }
-    }
+    // ── Required camera angle for the current exercise ─────────────────────────
+    @Volatile private var requiredCameraAngle: CameraAngle = CameraAngle.SIDE
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -188,14 +169,57 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Ends the session. Call when the user taps Stop or when auto-end fires.
-     * Resets the readiness machine so the ViewModel can be reused if needed.
+     * Loads reference data for [exerciseId] and fully resets all session state.
+     *
+     * Safe to call multiple times (e.g. "Try Again" from the result screen).
+     * Each call discards the previous session's rep count, scores, OE-DTW
+     * sequence, and rep-counting state, then reloads the reference JSON on a
+     * background thread.
+     *
+     * [jsonFileName] and [requiredCameraAngle] are read directly from [ExerciseInfo]
+     * in [exerciseList] — no internal mapping table.
      */
-    fun stopTraining() {
+    fun loadExercise(exerciseId: String) {
+        val info = exerciseList.find { it.id == exerciseId } ?: exerciseList.first()
+
+        // Reset all per-session state before (re-)loading the reference data.
         readinessMachine.reset()
         endDetector.reset()
+        repScoreTracker.reset()
+        userSequence.clear()
+        countRepsUseCase = CountRepsUseCase(info.id)
         wasTrainingPaused = false
+        requiredCameraAngle = info.requiredCameraAngle
+
+        _uiState.value = TrainingUiState(
+            requiredCameraAngle = info.requiredCameraAngle,
+            isReferenceLoaded   = false,
+        )
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val rawSeq = loadRawReferenceSequence(getApplication(), info.jsonFileName)
+            val normalizedSeq = rawSeq.map { normalizeLandmarks(it) }
+            withContext(Dispatchers.Main) {
+                rawReferenceSequence = rawSeq
+                referenceSequence    = normalizedSeq
+                _uiState.update { it.copy(isReferenceLoaded = true) }
+            }
+        }
+    }
+
+    /**
+     * Ends the session and resets all training state.
+     * Call when the user taps Stop. The phase transitions to FINISHED so the
+     * caller can navigate to the result screen before the state is wiped.
+     */
+    fun stopTraining() {
         _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
+        readinessMachine.reset()
+        endDetector.reset()
+        repScoreTracker.reset()
+        userSequence.clear()
+        countRepsUseCase.reset()
+        wasTrainingPaused = false
     }
 
     // ── Readiness phase ───────────────────────────────────────────────────────
@@ -204,9 +228,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val fullBody = isFullBodyInFrame(poseResult.visibilities)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
-        // Squat requires side view (ALGORITHM.md Module 5 / PRD §3.2).
-        // TODO: generalise — check exercise.requiredView instead of hardcoding SIDE.
-        val conditionsMet = fullBody && angle == CameraAngle.SIDE
+        val conditionsMet = fullBody && angle == requiredCameraAngle
 
         val readiness = readinessMachine.update(conditionsMet, System.currentTimeMillis())
 
@@ -247,7 +269,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (isPaused && !wasTrainingPaused) {
             repScoreTracker.discardCurrentRep()
             userSequence.clear()
-            stubRepState = StubRepState.STANDING
+            countRepsUseCase.reset()
         }
         wasTrainingPaused = isPaused
 
@@ -274,18 +296,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // EvaluateExerciseUseCase returns all-green with sf=100 when matchedIdx == -1.
         val scoreResult = evaluateUseCase.evaluate(matchedIdx, normalized, referenceSequence)
 
-        // Step 4 — accumulate this frame's score for the current rep
-        repScoreTracker.addFrameScore(scoreResult.sf)
+        // Step 4 — accumulate this frame's score for the current rep.
+        // hasRedJoint is computed here so it can be forwarded to RepScoreTracker for
+        // the correct/incorrect rep classification (continuous red-frame threshold).
+        val hasRedJoint = scoreResult.jointColors.any { it == Color.Red }
+        repScoreTracker.addFrameScore(scoreResult.sf, hasRedJoint)
 
-        // Step 5 — rep detection
-        // ── STUB ─────────────────────────────────────────────────────────────
-        // TODO: Replace the two lines below with:
-        //   val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
-        // once CountRepsUseCase (Module 4, owner: Lee) is implemented.
-        // The stub implements a simplified 2-state knee-angle check for squat only;
-        // it does not handle the full S1→S2→S3→S2→S1 cycle or side selection.
-        val repCompleted = checkRepCompletedStub(normalized)
-        // ── END STUB ─────────────────────────────────────────────────────────
+        // Step 5 — rep detection (Module 4)
+        val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
 
         val updatedRepScores = if (repCompleted) {
             repScoreTracker.finishRep()          // seals this rep's average score
@@ -297,8 +315,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // Expose the matched standard frame's raw landmarks only when at least one
         // joint is red — the UI can use this to render a "ghost" target skeleton.
-        val hasRedJoint = scoreResult.jointColors.any { it == Color.Red }
-        val matchedRaw  = if (hasRedJoint && matchedIdx != -1)
+        val matchedRaw = if (hasRedJoint && matchedIdx != -1)
             rawReferenceSequence[matchedIdx] else emptyList()
 
         _uiState.update { state ->
@@ -310,53 +327,11 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 matchedReferenceRawLandmarks = matchedRaw,
                 repCount                     = updatedRepScores.size,
                 repScores                    = updatedRepScores,
+                correctReps                  = repScoreTracker.correctReps,
+                incorrectReps                = repScoreTracker.incorrectReps,
                 isTrainingPaused             = false,
             )
         }
     }
 
-    // ── Stub: 2-state squat rep detector ─────────────────────────────────────
-    // TODO: delete this function once CountRepsUseCase is implemented.
-    //
-    // Mirrors ALGORITHM.md Module 4 (squat) but collapses the 3-state machine
-    // to 2 states for simplicity:
-    //   STANDING  → knee angle < SQUAT_S3_ANGLE (90°)  → SQUATTING
-    //   SQUATTING → knee angle > SQUAT_S1_ANGLE (160°) → STANDING  (rep counted)
-    //
-    // Uses left-side landmarks only. CountRepsUseCase will select the more-visible
-    // side and implement the complete S1→S2→S3→S2→S1 cycle.
-    private fun checkRepCompletedStub(normalized: List<Pair<Float, Float>>): Boolean {
-        val angle = computeKneeAngle(normalized) ?: return false
-        return when {
-            stubRepState == StubRepState.STANDING && angle < SQUAT_S3_ANGLE -> {
-                stubRepState = StubRepState.SQUATTING
-                false
-            }
-            stubRepState == StubRepState.SQUATTING && angle > SQUAT_S1_ANGLE -> {
-                stubRepState = StubRepState.STANDING
-                true   // rep complete
-            }
-            else -> false
-        }
-    }
-
-    /**
-     * Angle at the left knee (hip → knee ← ankle), in degrees.
-     * Returns null when either limb vector is degenerate.
-     */
-    private fun computeKneeAngle(normalized: List<Pair<Float, Float>>): Float? {
-        val hip   = normalized[LANDMARK_LEFT_HIP]
-        val knee  = normalized[LANDMARK_LEFT_KNEE]
-        val ankle = normalized[LANDMARK_LEFT_ANKLE]
-
-        val v1x = hip.first   - knee.first;   val v1y = hip.second   - knee.second
-        val v2x = ankle.first - knee.first;   val v2y = ankle.second - knee.second
-
-        val mag1 = sqrt(v1x * v1x + v1y * v1y)
-        val mag2 = sqrt(v2x * v2x + v2y * v2y)
-        if (mag1 < 1e-6f || mag2 < 1e-6f) return null
-
-        val cosine = ((v1x * v2x + v1y * v2y) / (mag1 * mag2)).coerceIn(-1f, 1f)
-        return Math.toDegrees(acos(cosine.toDouble())).toFloat()
-    }
 }

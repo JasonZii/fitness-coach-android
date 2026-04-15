@@ -58,7 +58,7 @@ fun ExerciseLibraryScreen(navController: NavHostController) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
-                            navController.navigate("exercise_detail/${exercise.id}")
+                            navController.navigate(Routes.exerciseDetail(exercise.id))
                         }
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically

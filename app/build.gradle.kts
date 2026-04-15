@@ -91,6 +91,7 @@ dependencies {
 
     // ViewModel + viewModelScope
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
 
     // CameraX
     implementation("androidx.camera:camera-camera2:1.3.4")

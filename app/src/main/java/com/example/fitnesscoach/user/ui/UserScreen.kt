@@ -24,7 +24,7 @@ fun UserScreen(navController: NavHostController) {
         ) {
             Text("AI Fitness Coach", fontSize = 26.sp)
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = { navController.navigate(Routes.TRAINING) }) {
+            Button(onClick = { navController.navigate(Routes.EXERCISE_LIBRARY) }) {
                 Text("Start Training")
             }
             Spacer(modifier = Modifier.height(12.dp))

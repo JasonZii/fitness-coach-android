@@ -58,19 +58,19 @@ exactly the same processing pipeline.
 JSON文件存放位置 / JSON file location:
 ```
 app/src/main/assets/landmarks/squat.json
-app/src/main/assets/landmarks/lunge.json
+app/src/main/assets/landmarks/right_leg_lunge_to_knee_raise.json
 app/src/main/assets/landmarks/bicep_curl.json
-app/src/main/assets/landmarks/shoulder_press.json
-app/src/main/assets/landmarks/lateral_raise.json
+app/src/main/assets/landmarks/standing_dumbbell_shoulder_press.json
+app/src/main/assets/landmarks/dumbbell_lateral_raise.json
 ```
 
 示范视频存放位置 / Demo video location:
 ```
-app/src/main/res/raw/squat_demo.mp4
-app/src/main/res/raw/lunge_demo.mp4
-app/src/main/res/raw/bicep_curl_demo.mp4
-app/src/main/res/raw/shoulder_press_demo.mp4
-app/src/main/res/raw/lateral_raise_demo.mp4
+app/src/main/res/raw/squat.mp4
+app/src/main/res/raw/right_leg_lunge_to_knee_raise.mp4
+app/src/main/res/raw/bicep_curl.mp4
+app/src/main/res/raw/standing_dumbbell_shoulder_press.mp4
+app/src/main/res/raw/dumbbell_lateral_raise.mp4
 ```
 
 JSON文件格式 / JSON file format:
@@ -432,42 +432,45 @@ calculate angle between vectors (Pref->P1) and (Pref->P2), range 0-180°.
 5个动作配置（初始阈值，Sprint 4测试后更新本文档）：
 Exercise configurations (initial thresholds, update after Sprint 4):
 
-深蹲 Squat（侧面 / side view）:
+深蹲 squat（侧面 / side view）:
 ```
 关键点：髋(23/24) - 膝(25/26) - 踝(27/28)，顶点：膝
-使用可见度更高的一侧
-S1（站直）: angle > 160°
-S3（蹲下）: angle < 90°
+使用右侧关节（index 24/26/28）
+S1（站直）: angle ≥ 160°
+S3（蹲下）: angle ≤ 90°
+角度方向：S1 → S3 递减
 ```
 
-弓步 Lunge（侧面 / side view）:
+弓步 right_leg_lunge_to_knee_raise（侧面 / side view）:
 ```
-关键点：前腿髋 - 前腿膝 - 前腿踝，顶点：膝
-S1（站直）: angle > 160°
-S3（最低点）: angle < 90°
-```
-
-二头弯举 Bicep Curl（侧面 / side view）:
-```
-关键点：腕(15/16) - 肘(13/14) - 肩(11/12)，顶点：肘
-使用可见度更高的一侧
-S1（手臂放下）: angle > 160°
-S3（弯举顶部）: angle < 50°
+关键点：右腿髋(24) - 右腿膝(26) - 右腿踝(28)，顶点：膝
+S1（站直）: angle ≥ 160°
+S3（最低点）: angle ≤ 90°
+角度方向：S1 → S3 递减
 ```
 
-肩上推举 Shoulder Press（侧面 / side view）:
+二头弯举 bicep_curl（侧面 / side view）:
 ```
-关键点：腕(15/16) - 肘(13/14) - 肩(11/12)，顶点：肘
-使用可见度更高的一侧
-S1（起始位置）: angle < 90°
-S3（推起到顶）: angle > 160°
+关键点：右腕(16) - 右肘(14) - 右肩(12)，顶点：肘
+S1（手臂放下）: angle ≥ 160°
+S3（弯举顶部）: angle ≤ 50°
+角度方向：S1 → S3 递减
 ```
 
-侧平举 Lateral Raise（正面 / front view）:
+肩上推举 standing_dumbbell_shoulder_press（正面 / front view）:
 ```
-关键点：髋(23) - 肩(11) - 腕(15)，顶点：肩
-S1（手臂放下）: angle < 30°
-S3（抬起到位）: angle > 80°
+关键点：右腕(16) - 右肘(14) - 右肩(12)，顶点：肘
+S1（起始位置，肘在肩高）: angle ≤ 90°
+S3（推起到顶）: angle ≥ 160°
+角度方向：S1 → S3 递增
+```
+
+侧平举 dumbbell_lateral_raise（正面 / front view）:
+```
+关键点：左髋(23) - 左肩(11) - 左腕(15)，顶点：肩
+S1（手臂放下）: angle ≤ 30°
+S3（抬起到位）: angle ≥ 80°
+角度方向：S1 → S3 递增
 ```
 
 验收标准 / Acceptance criteria:
@@ -499,8 +502,8 @@ theta < 60°  -> 侧面 side view
 
 各动作所需角度 / Required view per exercise:
 ```
-深蹲、弓步、二头弯举、肩上推举 -> 侧面 side view
-侧平举 -> 正面 front view
+squat、right_leg_lunge_to_knee_raise、bicep_curl -> 侧面 side view
+standing_dumbbell_shoulder_press、dumbbell_lateral_raise -> 正面 front view
 ```
 
 全身入画检测 / Full body in frame:
