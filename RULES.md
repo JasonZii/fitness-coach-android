@@ -245,19 +245,23 @@ const val END_VISIBILITY_THRESHOLD = 0.3f    // avg visibility below this trigge
 const val END_VISIBILITY_HOLD_SECONDS = 3    // seconds below threshold to confirm end
 const val END_SHOULDER_WIDTH_RATIO = 1.5f    // shoulder width multiplier to detect approach
 
-// State machine — Squat / Lunge
+// State machine — squat
 const val SQUAT_S1_ANGLE = 160f
 const val SQUAT_S3_ANGLE = 90f
 
-// State machine — Bicep Curl
+// State machine — right_leg_lunge_to_knee_raise
+const val LUNGE_S1_ANGLE = 160f
+const val LUNGE_S3_ANGLE = 90f
+
+// State machine — bicep_curl
 const val BICEP_CURL_S1_ANGLE = 160f
 const val BICEP_CURL_S3_ANGLE = 50f
 
-// State machine — Shoulder Press
+// State machine — standing_dumbbell_shoulder_press
 const val SHOULDER_PRESS_S1_ANGLE = 90f
 const val SHOULDER_PRESS_S3_ANGLE = 160f
 
-// State machine — Lateral Raise
+// State machine — dumbbell_lateral_raise
 const val LATERAL_RAISE_S1_ANGLE = 30f
 const val LATERAL_RAISE_S3_ANGLE = 80f
 

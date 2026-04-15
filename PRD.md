@@ -63,13 +63,13 @@ Fitness Coach 是一款基于 Android 平台的智能健身教练应用。使用
 
 **Supported exercises / 支持动作**:
 
-| Exercise / 动作 | Required View / 拍摄角度 |
-|---|---|
-| Squat / 深蹲 | Side / 侧面 |
-| Lunge / 弓步 | Side / 侧面 |
-| Bicep Curl / 二头弯举 | Side / 侧面 |
-| Shoulder Press / 肩上推举 | Side / 侧面 |
-| Lateral Raise / 侧平举 | Front / 正面 |
+| Exercise ID | Display Name / 显示名 | Required View / 拍摄角度 |
+|---|---|---|
+| `squat` | Squat / 深蹲 | Side / 侧面 |
+| `right_leg_lunge_to_knee_raise` | Right Leg Lunge to Knee Raise / 弓步膝举 | Side / 侧面 |
+| `bicep_curl` | Bicep Curl / 二头弯举 | Side / 侧面 |
+| `standing_dumbbell_shoulder_press` | Standing Dumbbell Shoulder Press / 肩上推举 | Front / 正面 |
+| `dumbbell_lateral_raise` | Dumbbell Lateral Raise / 侧平举 | Front / 正面 |
 
 ### 3.3 Training Module / 训练模块
 
@@ -78,7 +78,7 @@ Fitness Coach 是一款基于 Android 平台的智能健身教练应用。使用
 | TR-01 | Camera Preview / 摄像头预览 | The front camera feed is displayed full-screen with the skeleton overlaid in real time. / 前置摄像头画面全屏显示，实时叠加骨架。 |
 | TR-02 | Readiness Detection / 就位检测 | The system automatically checks that the user's full body is in frame and that the camera angle matches the exercise requirement (side or front view). / 系统自动检测用户全身是否入画，以及拍摄角度是否符合当前动作要求（侧面/正面）。 |
 | TR-03 | Countdown / 倒计时 | When both readiness conditions are satisfied for 3 consecutive seconds, a 3-2-1 countdown is displayed before training begins. / 两个就位条件同时满足且持续3秒后，屏幕显示3-2-1倒计时，倒计完毕训练开始。 |
-| TR-04 | Skeleton Overlay / 骨架叠加 | During training, 33 key landmarks and 13 limb segments are overlaid on the camera feed; each is coloured green (≥ 80 score) or red (< 80 score). / 训练中，33个关节点和13条肢体线段叠加在画面上，根据得分实时显示绿色（≥ 80）或红色（< 80）。 |
+| TR-04 | Skeleton Overlay / 骨架叠加 | During training, 33 key landmarks and 13 limb segments are overlaid on the camera feed; each is coloured green or red. / 训练中，33个关节点和13条肢体线段叠加在画面上，根据得分实时显示绿色或红色。 |
 | TR-05 | Rep Counting / 计次 | The app automatically counts completed repetitions using a state machine that monitors key joint angles. / 应用通过监测关键关节角度变化的状态机自动计算完成次数。 |
 | TR-06 | Per-rep Score / 单次得分 | Each completed repetition receives a score (0–100) based on the average per-frame score during that rep. / 每次动作结束后，系统对该次所有帧得分取平均值作为单次得分（0–100）。 |
 | TR-07 | Auto Pause / 自动暂停 | When the user walks toward the phone (shoulder width increases > 1.5×) or key landmarks disappear (average visibility < 0.3 for > 3 s), recording automatically pauses. / 用户走近手机（肩宽增大超1.5倍）或关键关节消失（平均可见度 < 0.3 持续 > 3秒）时，系统自动暂停记录。 |
@@ -89,7 +89,7 @@ Fitness Coach 是一款基于 Android 平台的智能健身教练应用。使用
 | ID | Feature / 功能 | Description / 描述 |
 |---|---|---|
 | SUM-01 | Total Reps / 总次数 | Displays the total number of completed repetitions in this session. / 显示本次训练完成的总次数。 |
-| SUM-02 | Per-rep Scores / 每次得分 | Displays the score for each individual repetition. / 显示每次动作的得分。 |
+| SUM-02 | Correct / Incorrect Rep Count / 正确与不正确次数 | Displays the number of correct reps and incorrect reps. / 显示本次训练中正确次数和不正确次数。 |
 | SUM-03 | Average Score / 平均分 | Displays the average score across all repetitions. / 显示所有次数的平均分。 |
 | SUM-04 | High-frequency Deviation Joints / 高频偏差关节 | Lists the joints that were most frequently scored below 80 during the session, to guide improvement. / 列出本次训练中最频繁低于80分的关节，用于指导改进。 |
 | SUM-05 | Save Record / 保存记录 | The session data is automatically saved to the local Room database. / 训练数据自动保存到本地 Room 数据库。 |
@@ -98,7 +98,8 @@ Fitness Coach 是一款基于 Android 平台的智能健身教练应用。使用
 
 | ID | Feature / 功能 | Description / 描述 |
 |---|---|---|
-| REC-01 | Record List / 记录列表 | User can view a list of all past training sessions; each record directly shows the date, exercise type, rep count, and average score. No separate detail page is needed. / 用户可查看所有历史训练记录列表，每条记录直接显示日期、动作类型、次数、平均得分，不需要单独的详情页。 |
+| REC-01 | Record List / 记录列表 | User can view a list of all past training sessions; each row shows the date and exercise type. / 用户可查看所有历史训练记录列表，每条记录显示日期和动作类型。 |
+| REC-02 | Record Detail / 记录详情 | User can tap any row in the record list to open the detail page for that session. The detail page displays the full training summary: exercise name, total reps, correct rep count, incorrect rep count, average score, and high-frequency deviation joints. / 用户点击列表中任意一条记录，进入该训练记录的详情页。详情页显示完整训练总结：动作名称、总次数、正确次数、不正确次数、平均得分、高频偏差关节。 |
 
 ---
 
@@ -132,7 +133,13 @@ Login Screen / 登录页
                               │                                  │
                               ▼                                  ▼
                         Record List Screen          Training Screen / 训练页
-                        /记录列表页                        │
+                        / 记录列表页                       │
+                              │
+                    (tap a record / 点击记录)
+                              │
+                              ▼
+                        Record Detail Screen
+                        / 记录详情页
                                                    [Place phone, step back]
                                                    [放好手机，走到训练位置]
                                                            │
@@ -159,7 +166,8 @@ Login Screen / 登录页
                                                            ▼
                                                   Training Summary / 训练总结
                                                   • Total reps / 总次数
-                                                  • Per-rep scores / 每次得分
+                                                  • Correct / incorrect reps
+                                                    正确次数 / 不正确次数
                                                   • Average score / 平均分
                                                   • High-freq deviation joints
                                                     高频偏差关节
@@ -280,11 +288,11 @@ A repetition is only counted when the full cycle **S1 → S2 → S3 → S2 → S
 
 | Exercise / 动作 | Key joints / 关键关节 | S1 threshold / S1 阈值 | S3 threshold / S3 阈值 |
 |---|---|---|---|
-| Squat / 深蹲 | Hip–Knee–Ankle | > 160° (standing) | < 90° (squat) |
-| Lunge / 弓步 | Hip–Knee–Ankle (front leg) | > 160° (standing) | < 90° (lunge) |
-| Bicep Curl / 二头弯举 | Wrist–Elbow–Shoulder | > 160° (arm down) | < 50° (curl top) |
-| Shoulder Press / 肩上推举 | Wrist–Elbow–Shoulder | < 90° (start) | > 160° (press top) |
-| Lateral Raise / 侧平举 | Hip–Shoulder–Wrist | < 30° (arm down) | > 80° (raise top) |
+| `squat` | Hip–Knee–Ankle | ≥ 160° (standing) | ≤ 90° (squat) |
+| `right_leg_lunge_to_knee_raise` | Hip–Knee–Ankle (right leg) | ≥ 160° (standing) | ≤ 90° (lunge) |
+| `bicep_curl` | Wrist–Elbow–Shoulder | ≥ 160° (arm down) | ≤ 50° (curl top) |
+| `standing_dumbbell_shoulder_press` | Wrist–Elbow–Shoulder | ≤ 90° (start) | ≥ 160° (press top) |
+| `dumbbell_lateral_raise` | Hip–Shoulder–Wrist | ≤ 30° (arm down) | ≥ 80° (raise top) |
 
 ### 5.5 Camera Angle & Readiness Detection / 拍摄角度与就位检测
 
@@ -412,8 +420,9 @@ Cached in memory per exercise / 按动作缓存在内存中
 | `exercise_list` | ExerciseListScreen | — |
 | `exercise_detail/{id}` | ExerciseDetailScreen | With exercise ID param |
 | `training/{exerciseId}` | TrainingScreen | Active training session |
-| `training_summary` | TrainingSummaryScreen | Post-session summary |
-| `record` | RecordScreen / RecordListScreen | — |
+| `training_result/{exerciseId}/{repCount}/{avgScore}` | ResultScreen | Post-session summary |
+| `record_list` | RecordListScreen | Training history list |
+| `record_detail/{id}` | RecordDetailScreen | Detail view of one record |
 
 ### 6.5 Local Database Schema / 本地数据库 Schema
 
@@ -448,7 +457,8 @@ Cached in memory per exercise / 按动作缓存在内存中
 | exerciseId | INTEGER FK | — |
 | timestamp | INTEGER | Unix epoch ms |
 | totalReps | INTEGER | — |
-| repScores | TEXT | JSON array of Float |
+| correctReps | INTEGER | Reps with no visible red joints / 单次动作看到骨架全绿为正确 |
+| incorrectReps | INTEGER | Reps with visible red joints / 单次动作看到有部位标红算错误 |
 | averageScore | REAL | — |
 | highFreqDeviationJoints | TEXT | JSON array of Int (landmark indices) |
 

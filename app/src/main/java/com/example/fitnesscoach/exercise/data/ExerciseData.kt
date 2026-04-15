@@ -1,12 +1,18 @@
 package com.example.fitnesscoach.exercise.data
 
 import com.example.fitnesscoach.R
+import com.example.fitnesscoach.training.pose.CameraAngle
+
 data class ExerciseInfo(
     val id: String,
     val title: String,
     val description: String,
     val imageRes: Int,
-    val videoRes: Int
+    val videoRes: Int,
+    /** Filename inside assets/landmarks/ used to load the reference pose sequence. */
+    val jsonFileName: String,
+    /** Camera angle the user must stand at before the readiness countdown begins. */
+    val requiredCameraAngle: CameraAngle,
 )
 
 val exerciseList = listOf(
@@ -23,10 +29,12 @@ val exerciseList = listOf(
         Push through your heels to return to the starting position.
         Breathe in as you go down, and exhale as you come up.
         Tip:
-        Don’t lean forward too much, and keep your weight on your heels to protect your knees.
-                """.trimIndent(),
+        Don't lean forward too much, and keep your weight on your heels to protect your knees.
+        """.trimIndent(),
         imageRes = R.drawable.squat,
-        videoRes = R.raw.squat
+        videoRes = R.raw.squat,
+        jsonFileName = "squat.json",
+        requiredCameraAngle = CameraAngle.SIDE,
     ),
     ExerciseInfo(
         id = "dumbbell_lateral_raise",
@@ -39,31 +47,35 @@ val exerciseList = listOf(
         Keep a slight bend in your elbows.
         Pause briefly at the top.
         Slowly lower the dumbbells back to the starting position.
-        
+
         Tip:
         Avoid swinging your body. Use controlled movement to target your shoulders.
-                """.trimIndent(),
+        """.trimIndent(),
         imageRes = R.drawable.dumbbell_lateral_raise,
-        videoRes = R.raw.dumbbell_lateral_raise
-        ),
+        videoRes = R.raw.dumbbell_lateral_raise,
+        jsonFileName = "dumbbell_lateral_raise.json",
+        requiredCameraAngle = CameraAngle.FRONT,
+    ),
     ExerciseInfo(
-        id = "dumbbell_overhead_triceps_extension",
-        title = "Dumbbell Overhead Triceps Extension",
+        id = "bicep_curl",
+        title = "Bicep Curl",
         description = """
-        How to Perform a Dumbbell Overhead Triceps Extension:
-        Stand or sit with a dumbbell held by both hands overhead.
-        Keep your upper arms close to your head.
-        Slowly bend your elbows to lower the dumbbell behind your head.
-        Pause when you feel a stretch in your triceps.
-        Extend your arms back up to the starting position.
-        
-        Tip:
-        Keep your elbows steady and avoid flaring them out.
-                """.trimIndent(),
-        imageRes = R.drawable.dumbbell_overhead_triceps_extension,
-        videoRes = R.raw.dumbbell_overhead_triceps_extension
-        ),
+        How to Perform a Bicep Curl:
+        Stand upright with a dumbbell in each hand, arms fully extended at your sides.
+        Keep your elbows close to your torso and your palms facing forward.
+        Slowly curl the dumbbells upward by contracting your biceps.
+        Continue raising until the dumbbells are at shoulder level.
+        Pause briefly at the top, then slowly lower the dumbbells back to the starting position.
 
+        Tip:
+        Keep your upper arms stationary throughout the movement. Only your forearms should move.
+        Avoid swinging your body to lift the weight.
+        """.trimIndent(),
+        imageRes = R.drawable.bicep_curl,
+        videoRes = R.raw.bicep_curl,
+        jsonFileName = "bicep_curl.json",
+        requiredCameraAngle = CameraAngle.SIDE,
+    ),
     ExerciseInfo(
         id = "right_leg_lunge_to_knee_raise",
         title = "Right Leg Lunge To Knee Raise",
@@ -75,14 +87,15 @@ val exerciseList = listOf(
         Push through your right heel to stand up.
         As you rise, bring your right knee up toward your chest.
         Return to the starting position and repeat.
-        
+
         Tip:
         Keep your balance and engage your core throughout the movement.
-                """.trimIndent(),
+        """.trimIndent(),
         imageRes = R.drawable.right_leg_lunge_to_knee_raise,
-        videoRes = R.raw.right_leg_lunge_to_knee_raise
-        ),
-
+        videoRes = R.raw.right_leg_lunge_to_knee_raise,
+        jsonFileName = "right_leg_lunge_to_knee_raise.json",
+        requiredCameraAngle = CameraAngle.SIDE,
+    ),
     ExerciseInfo(
         id = "standing_dumbbell_shoulder_press",
         title = "Standing Dumbbell Shoulder Press",
@@ -93,11 +106,13 @@ val exerciseList = listOf(
         Press the dumbbells upward until your arms are fully extended.
         Pause briefly at the top.
         Slowly lower the dumbbells back to shoulder level.
-        
+
         Tip:
         Avoid arching your back. Keep your core tight and stable.
-                """.trimIndent(),
+        """.trimIndent(),
         imageRes = R.drawable.standing_dumbbell_shoulder_press,
-        videoRes = R.raw.standing_dumbbell_shoulder_press
-        )
+        videoRes = R.raw.standing_dumbbell_shoulder_press,
+        jsonFileName = "standing_dumbbell_shoulder_press.json",
+        requiredCameraAngle = CameraAngle.FRONT,
+    ),
 )
