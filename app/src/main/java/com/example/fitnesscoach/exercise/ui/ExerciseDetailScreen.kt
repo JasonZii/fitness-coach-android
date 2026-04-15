@@ -70,7 +70,7 @@ fun ExerciseDetailScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { navController.navigate(Routes.TRAINING) },
+                onClick = { navController.navigate(Routes.training(exerciseId)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)

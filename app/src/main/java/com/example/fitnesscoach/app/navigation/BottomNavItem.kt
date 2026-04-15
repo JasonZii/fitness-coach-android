@@ -13,19 +13,14 @@ sealed class BottomNavItem(
     val route: String,
     val icon: ImageVector
 ) {
-    object Home : BottomNavItem("Home", Routes.HOME, Icons.Default.Home)
-    object Training : BottomNavItem("Training", Routes.TRAINING, Icons.Default.FitnessCenter)
-
+    object Home    : BottomNavItem("Home",    Routes.HOME,             Icons.Default.Home)
     object Library : BottomNavItem("Library", Routes.EXERCISE_LIBRARY, Icons.Default.FitnessCenter)
-
-//    object Record : BottomNavItem("Record", Routes.RECORD, Icons.Default.History)
-    object History : BottomNavItem("History", Routes.RECORD_LIST, Icons.Default.History)
-    object User : BottomNavItem("Profile", Routes.USER, Icons.Default.Person)
+    object History : BottomNavItem("History", Routes.RECORD_LIST,      Icons.Default.History)
+    object User    : BottomNavItem("Profile", Routes.USER,             Icons.Default.Person)
 }
 
 val bottomNavItems = listOf(
     BottomNavItem.Home,
-    BottomNavItem.Training,
     BottomNavItem.Library,
     BottomNavItem.History,
     BottomNavItem.User

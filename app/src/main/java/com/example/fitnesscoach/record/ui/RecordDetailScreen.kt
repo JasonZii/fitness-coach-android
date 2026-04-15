@@ -131,7 +131,7 @@ fun RecordDetailScreen(
                 }
 
                 Button(
-                    onClick = { navController.navigate(Routes.TRAINING) },
+                    onClick = { navController.navigate(Routes.EXERCISE_LIBRARY) },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Try Again")
