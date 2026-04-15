@@ -1,5 +1,7 @@
 package com.example.fitnesscoach.training.core
 
+import com.example.fitnesscoach.core.util.Constants.MAX_CONSECUTIVE_RED_FRAMES
+
 class RepScoreTracker {
     private val currentRepFrameScores = mutableListOf<Float>()
     private val completedRepScores = mutableListOf<Float>()
@@ -44,8 +46,8 @@ class RepScoreTracker {
         val repScore = currentRepFrameScores.average().toFloat()
         completedRepScores.add(repScore)
         
-        // If max continuous red frames across this rep is <= 5 (approx 0.25s), it's considered CORRECT
-        if (maxConsecutiveRed <= 5) {
+        // If max continuous red frames across this rep is <= MAX_CONSECUTIVE_RED_FRAMES (~0.25s), it's considered CORRECT
+        if (maxConsecutiveRed <= MAX_CONSECUTIVE_RED_FRAMES) {
             correctReps++
         } else {
             incorrectReps++

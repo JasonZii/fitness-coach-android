@@ -213,13 +213,13 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
      * caller can navigate to the result screen before the state is wiped.
      */
     fun stopTraining() {
+        _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
         readinessMachine.reset()
         endDetector.reset()
         repScoreTracker.reset()
         userSequence.clear()
         countRepsUseCase.reset()
         wasTrainingPaused = false
-        _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
     }
 
     // ── Readiness phase ───────────────────────────────────────────────────────

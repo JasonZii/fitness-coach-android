@@ -68,6 +68,10 @@ object Constants {
     const val LATERAL_RAISE_S1_ANGLE = 30f   // arm at side;            angle ≤ this → S1 territory
     const val LATERAL_RAISE_S3_ANGLE = 80f   // arm raised to shoulder; angle ≥ this → S3 territory
 
+    // Module 4: Rep correctness classification
+    // A rep is CORRECT when the longest consecutive-red-frame run is ≤ this value (~0.25 s at 20 fps)
+    const val MAX_CONSECUTIVE_RED_FRAMES = 5
+
     // Module 6: Training end detection
     // Average visibility of key landmarks below this triggers pause
     const val END_VISIBILITY_THRESHOLD = 0.3f
