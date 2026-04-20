@@ -57,6 +57,10 @@ object Routes {
         correctReps: Int,
         incorrectReps: Int,
     ) = "training_result/$exerciseId/$repCount/$avgScore/$correctReps/$incorrectReps"
+
+    fun recordDetail(recordId: Int): String{
+        return "$RECORD_DETAIL/$recordId"
+    }
 }
 
 @Composable
@@ -118,14 +122,15 @@ fun AppNavGraph(
             val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: ""
             ExerciseDetailScreen(navController, exerciseId)
         }
-
         composable(Routes.RECORD_LIST) {
             RecordListScreen(navController)
         }
-
         composable("${Routes.RECORD_DETAIL}/{recordId}") { backStackEntry ->
-            val recordId = backStackEntry.arguments?.getString("recordId") ?: ""
-            RecordDetailScreen(navController, recordId)
+            val recordId = backStackEntry.arguments?.getString("recordId")?.toIntOrNull() ?: 0
+            RecordDetailScreen(
+                navController = navController,
+                recordId = recordId
+            )
         }
 
 

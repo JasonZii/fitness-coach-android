@@ -6,28 +6,44 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.room.Room
 import com.example.fitnesscoach.app.navigation.Routes
+import com.example.fitnesscoach.data.local.AppDatabase
+import com.example.fitnesscoach.data.local.TrainingRecordEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordDetailScreen(
     navController: NavHostController,
-    recordId: String
+    recordId: Int
 ) {
-    val exerciseName = when (recordId) {
-        "1" -> "Squat"
-        "2" -> "Plank"
-        "3" -> "Lunge"
-        "4" -> "Plank"
-        "5" -> "Plank"
-        "6" -> "Plank"
-        "7" -> "Squat"
-        else -> "Unknown"
+    val context = LocalContext.current
+
+    val database = remember {
+        Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "fitnesscoach_db"
+        ).build()
+    }
+
+    val dao = database.trainingRecordDao()
+    val scope = rememberCoroutineScope()
+
+    var record by remember { mutableStateOf<TrainingRecordEntity?>(null) }
+
+    LaunchedEffect(recordId) {
+        scope.launch(Dispatchers.IO) {
+            record = dao.getRecordById(recordId)
+        }
     }
 
     Scaffold(
@@ -72,7 +88,7 @@ fun RecordDetailScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = exerciseName,
+                        text = record?.exerciseName ?: "Loading...",
                         style = MaterialTheme.typography.titleLarge
                     )
                 }
@@ -94,11 +110,11 @@ fun RecordDetailScreen(
                         style = MaterialTheme.typography.titleLarge
                     )
 
-                    RecordInfoRow(label = "Exercise", value = exerciseName)
-                    RecordInfoRow(label = "Duration", value = "--")
-                    RecordInfoRow(label = "Repetition", value = "--")
-                    RecordInfoRow(label = "Correct Counts", value = "--")
-                    RecordInfoRow(label = "Incorrect Counts", value = "--")
+                    RecordInfoRow(label = "Exercise", value = record?.exerciseName ?: "--")
+                    RecordInfoRow(label = "Score", value = record?.avgScore?.toString() ?: "--")
+                    RecordInfoRow(label = "Repetition", value = record?.repCount?.toString() ?: "--")
+                    RecordInfoRow(label = "Correct Counts", value = record?.correctReps?.toString() ?: "--")
+                    RecordInfoRow(label = "Incorrect Counts", value = record?.incorrectReps?.toString() ?: "--")
                 }
             }
 
@@ -138,7 +154,7 @@ fun RecordDetailScreen(
                 }
 
                 Button(
-                    onClick = { navController.popBackStack() },
+                    onClick = { navController.navigate(Routes.RECORD_LIST) },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("History")

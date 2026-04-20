@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.hilt.android)
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -104,4 +105,9 @@ dependencies {
     //ExoPlayer
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+
+    //Room
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
 }
