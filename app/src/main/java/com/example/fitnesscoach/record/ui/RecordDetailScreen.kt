@@ -18,6 +18,11 @@ import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.draw.clip
+import com.example.fitnesscoach.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +44,15 @@ fun RecordDetailScreen(
     val scope = rememberCoroutineScope()
 
     var record by remember { mutableStateOf<TrainingRecordEntity?>(null) }
+
+    val imageRes = when (record?.exerciseId) {
+        "squat" -> R.drawable.squat
+        "dumbbell_lateral_raise" -> R.drawable.dumbbell_lateral_raise
+        "bicep_curl" -> R.drawable.bicep_curl
+        "right_leg_lunge_to_knee_raise" -> R.drawable.right_leg_lunge_to_knee_raise
+        "standing_dumbbell_shoulder_press" -> R.drawable.standing_dumbbell_shoulder_press
+        else -> null
+    }
 
     LaunchedEffect(recordId) {
         scope.launch(Dispatchers.IO) {
@@ -81,16 +95,25 @@ fun RecordDetailScreen(
                 shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = record?.exerciseName ?: "Loading...",
-                        style = MaterialTheme.typography.titleLarge
+                if (imageRes != null) {
+                    Image(
+                        painter = painterResource(id = imageRes),
+                        contentDescription = record?.exerciseName ?: "Exercise Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = record?.exerciseName ?: "Loading...",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
                 }
             }
 
@@ -118,20 +141,7 @@ fun RecordDetailScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                TextButton(onClick = { }) {
-                    Text("Save")
-                }
-
-                TextButton(onClick = { }) {
-                    Text("Discard")
-                }
-            }
+            Spacer(modifier = Modifier.height(12.dp))
 
             Spacer(modifier = Modifier.weight(1f))
 
@@ -140,21 +150,24 @@ fun RecordDetailScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
-                    onClick = { navController.navigate(Routes.HOME) },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Home")
-                }
+                    onClick = {
+                        record?.let {
+                            navController.navigate(Routes.training(it.exerciseId)) {
+//                                popUpTo(Routes.RECORD_DETAIL) { inclusive = true }
 
-                Button(
-                    onClick = { navController.navigate(Routes.EXERCISE_LIBRARY) },
+                                popUpTo(Routes.RECORD_LIST) { saveState = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Try Again")
                 }
 
                 Button(
-                    onClick = { navController.navigate(Routes.RECORD_LIST) },
+//                    onClick = { navController.navigate(Routes.RECORD_LIST) },
+                    onClick = { navController.popBackStack() },
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("History")

@@ -23,33 +23,49 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
+import androidx.room.Room
 import com.example.fitnesscoach.app.navigation.Routes
-
-data class HistoryItem(
-    val id: String,
-    val number: Int,
-    val date: String,
-    val exercise: String
-)
+import com.example.fitnesscoach.data.local.AppDatabase
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.runtime.saveable.rememberSaveable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordListScreen(navController: NavHostController) {
-    val historyList = listOf(
-        HistoryItem("1", 1, "2025-10-03", "Squat"),
-        HistoryItem("2", 2, "2025-10-04", "Plank"),
-        HistoryItem("3", 3, "2025-10-06", "Lunge"),
-        HistoryItem("4", 4, "2025-10-06", "Plank"),
-        HistoryItem("5", 5, "2025-10-06", "Plank"),
-        HistoryItem("6", 6, "2025-10-06", "Plank"),
-        HistoryItem("7", 7, "2025-10-07", "Squat")
-    )
+    val context = LocalContext.current
+
+    val database = remember {
+        Room.databaseBuilder(
+            context,
+            AppDatabase::class.java,
+            "fitnesscoach_db"
+        ).build()
+    }
+
+    val dao = database.trainingRecordDao()
+    val records by dao.getAllRecords().collectAsState(initial = emptyList())
 
     var searchText by remember { mutableStateOf("") }
+
+//    val filteredRecords = records.filter {
+////        it.exerciseName.contains(searchText, ignoreCase = true)
+//    }
+
+    val filteredRecords = records.filter { record ->
+        val formattedDate = formatDateTime(record.createdAt)
+
+        searchText.isBlank() ||
+                record.exerciseName.contains(searchText, ignoreCase = true) ||
+                formattedDate.contains(searchText, ignoreCase = true)
+    }
 
     Scaffold(
         topBar = {
@@ -108,69 +124,103 @@ fun RecordListScreen(navController: NavHostController) {
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(14.dp)
                     )
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "No.",
-                    modifier = Modifier.weight(0.8f),
-                    style = MaterialTheme.typography.titleSmall
-                )
-                Text(
                     text = "Date",
-                    modifier = Modifier.weight(1.8f),
+                    modifier = Modifier.weight(1.5f),
                     style = MaterialTheme.typography.titleSmall
                 )
+
                 Text(
                     text = "Exercise",
-                    modifier = Modifier.weight(1.8f),
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleSmall
                 )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(historyList) { item ->
-                    Card(
+//            if (filteredRecords.isEmpty()) {
+//                Box(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .weight(1f),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text(
+//                        text = "No records",
+//                        style = MaterialTheme.typography.bodyLarge,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
+//                }
+
+                if (records.isEmpty()) {
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                navController.navigate("record_detail/${item.id}")
-                            },
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
+                        Text(
+                            text = "No records yet",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else if (filteredRecords.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No matching results",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredRecords) { item ->
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .clickable {
+                                    navController.navigate(Routes.recordDetail(item.id))
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Text(
-                                text = item.number.toString(),
-                                modifier = Modifier.weight(0.8f),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                text = item.date,
-                                modifier = Modifier.weight(1.8f),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                text = item.exercise,
-                                modifier = Modifier.weight(1.8f),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = formatDateTime(item.createdAt),
+                                    modifier = Modifier.weight(1.5f),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+
+                                Text(
+                                    text = item.exerciseName,
+                                    modifier = Modifier.weight(1f),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
                         }
                     }
-                }
 
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
 
@@ -203,4 +253,9 @@ fun RecordListScreen(navController: NavHostController) {
             }
         }
     }
+}
+
+private fun formatDateTime(timestamp: Long): String {
+    val formatter = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+    return formatter.format(Date(timestamp))
 }

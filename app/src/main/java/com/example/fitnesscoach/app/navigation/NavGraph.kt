@@ -37,6 +37,7 @@ object Routes {
 
     const val RECORD_LIST = "record_list"
     const val RECORD_DETAIL = "record_detail"
+    const val TRAINING = "training"
 
     // ── Training routes ───────────────────────────────────────────────────────
 
@@ -132,7 +133,14 @@ fun AppNavGraph(
                 recordId = recordId
             )
         }
+        composable("${Routes.TRAINING}/{exerciseId}") { backStackEntry ->
+            val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
 
+            TrainingScreen(
+                navController = navController,
+                exerciseId = exerciseId
+            )
+        }
 
     }
 }
