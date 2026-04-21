@@ -25,15 +25,9 @@ import com.example.fitnesscoach.training.pose.ReadinessPhase
 import com.example.fitnesscoach.training.viewmodel.SessionPhase
 import com.example.fitnesscoach.training.viewmodel.TrainingUiState
 import com.example.fitnesscoach.training.viewmodel.TrainingViewModel
-import androidx.room.Room
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import com.example.fitnesscoach.data.local.AppDatabase
-import com.example.fitnesscoach.data.local.TrainingRecordEntity
-import kotlinx.coroutines.withContext
 
 @Composable
-fun TrainingScreen(
+fun TrainingScreenOld(
     navController: NavHostController,
     exerciseId: String = "squat",
     modifier: Modifier = Modifier
@@ -41,15 +35,6 @@ fun TrainingScreen(
     val context = LocalContext.current
     val viewModel: TrainingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
-    val database = remember {
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "fitnesscoach_db"
-        ).build()
-    }
-    val dao = database.trainingRecordDao()
-    val scope = rememberCoroutineScope()
 
     // Load the correct exercise reference data once when the screen opens.
     LaunchedEffect(exerciseId) {
@@ -113,49 +98,13 @@ fun TrainingScreen(
                         uiState.repScores.average().toInt() else 0
                     val correctReps   = uiState.correctReps
                     val incorrectReps = uiState.incorrectReps
-
                     viewModel.stopTraining()
-
-//                    navController.navigate(
-////                        Routes.trainingResult(exerciseId, repCount, avgScore, correctReps, incorrectReps)
-//                        Routes.recordDetail(exerciseId = exerciseId,
-//                        repCount = repCount,
-//                        avgScore = avgScore,
-//                        correctReps = correctReps,
-//                        incorrectReps = incorrectReps
-//                    )
-//                    ) {
-//                        // Remove the training screen from the back stack so the user
-//                        // can navigate back normally to Library / Home from ResultScreen.
-//                        popUpTo(Routes.training(exerciseId)) { inclusive = true }
-//                    }
-
-                    val exerciseName = when (exerciseId) {
-                        "squat" -> "Squat"
-                        "dumbbell_lateral_raise" -> "Dumbbell Lateral Raise"
-                        "dumbbell_overhead_triceps_extension" -> "Dumbbell Overhead Triceps Extension"
-                        "right_leg_lunge_to_knee_raise" -> "Right Leg Lunge To Knee Raise"
-                        "standing_dumbbell_shoulder_press" -> "Standing Dumbbell Shoulder Press"
-                        else -> "Unknown"
-                    }
-
-                    scope.launch(Dispatchers.IO) {
-                        val newRecordId = dao.insertRecord(
-                            TrainingRecordEntity(
-                                exerciseId = exerciseId,
-                                exerciseName = exerciseName,
-                                repCount = repCount,
-                                avgScore = avgScore,
-                                correctReps = correctReps,
-                                incorrectReps = incorrectReps
-                            )
-                        ).toInt()
-
-                        withContext(Dispatchers.Main) {
-                            navController.navigate(Routes.recordDetail(newRecordId)) {
-                                popUpTo(Routes.training(exerciseId)) { inclusive = true }
-                            }
-                        }
+                    navController.navigate(
+                        Routes.trainingResult(exerciseId, repCount, avgScore, correctReps, incorrectReps)
+                    ) {
+                        // Remove the training screen from the back stack so the user
+                        // can navigate back normally to Library / Home from ResultScreen.
+                        popUpTo(Routes.training(exerciseId)) { inclusive = true }
                     }
                 }
             )
