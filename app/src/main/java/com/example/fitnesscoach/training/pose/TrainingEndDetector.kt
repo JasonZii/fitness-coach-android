@@ -8,7 +8,6 @@ import com.example.fitnesscoach.core.util.Constants.LANDMARK_NOSE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
-import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
@@ -66,6 +65,13 @@ class TrainingEndDetector {
     private var baselineShoulderWidth: Float = 0f
 
     /**
+     * Required camera angle for the current exercise, set by [onTrainingStart].
+     * SIDE-view exercises disable [isTooClose] because the baseline shoulder width
+     * is near-zero when viewed sideways, causing false positives on any movement.
+     */
+    private var requiredCameraAngle: CameraAngle = CameraAngle.FRONT
+
+    /**
      * Timestamp (ms) when the average landmark visibility first dropped below threshold.
      * Null when visibility is at or above the threshold.
      */
@@ -82,8 +88,12 @@ class TrainingEndDetector {
      *
      * @param landmarks Raw MediaPipe landmarks for the starting frame.
      */
-    fun onTrainingStart(landmarks: List<Triple<Float, Float, Float>>) {
+    fun onTrainingStart(
+        landmarks: List<Triple<Float, Float, Float>>,
+        requiredCameraAngle: CameraAngle,
+    ) {
         baselineShoulderWidth = shoulderWidth(landmarks)
+        this.requiredCameraAngle = requiredCameraAngle
         visibilityDropSinceMs = null
         currentState = TrainingPauseState.ACTIVE
     }
@@ -113,6 +123,7 @@ class TrainingEndDetector {
      */
     fun reset() {
         baselineShoulderWidth = 0f
+        requiredCameraAngle = CameraAngle.FRONT
         visibilityDropSinceMs = null
         currentState = TrainingPauseState.ACTIVE
     }
@@ -125,6 +136,9 @@ class TrainingEndDetector {
      * Returns false before [onTrainingStart] is called (baseline == 0).
      */
     private fun isTooClose(landmarks: List<Triple<Float, Float, Float>>): Boolean {
+        // Side-view baseline shoulder width is near-zero (both shoulders overlap on x-axis),
+        // so any movement would exceed the 1.5× ratio — disable this check for side view.
+        if (requiredCameraAngle == CameraAngle.SIDE) return false
         if (baselineShoulderWidth < 1e-6f) return false
         val current = shoulderWidth(landmarks)
         return current > baselineShoulderWidth * END_SHOULDER_WIDTH_RATIO

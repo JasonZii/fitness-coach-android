@@ -1,5 +1,9 @@
 package com.example.fitnesscoach.training.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
@@ -51,6 +56,23 @@ fun TrainingScreen(
     val dao = database.trainingRecordDao()
     val scope = rememberCoroutineScope()
 
+    // ── Camera permission ────────────────────────────────────────────────────
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted -> hasCameraPermission = granted }
+
+    LaunchedEffect(Unit) {
+        if (!hasCameraPermission) {
+            permissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     // Load the correct exercise reference data once when the screen opens.
     LaunchedEffect(exerciseId) {
         viewModel.loadExercise(exerciseId)
@@ -59,11 +81,13 @@ fun TrainingScreen(
     Box(modifier = modifier.fillMaxSize()) {
 
         // ── Layer 1: live camera feed ─────────────────────────────────────────
-        CameraPreview(
-            modifier = Modifier.fillMaxSize(),
-            context = context,
-            onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
-        )
+        if (hasCameraPermission) {
+            CameraPreview(
+                modifier = Modifier.fillMaxSize(),
+                context = context,
+                onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
+            )
+        }
 
         // ── Layer 2: user skeleton overlay ───────────────────────────────────
         if (uiState.landmarks.size == LANDMARK_COUNT) {

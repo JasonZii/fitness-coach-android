@@ -92,6 +92,9 @@ class PoseFrameProcessor(context: Context) {
 
         val matrix = Matrix()
         matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
+        // Front camera sensor output is unmirrored; flip horizontally so landmark
+        // coordinates match the mirrored PreviewView shown to the user.
+        matrix.postScale(-1f, 1f)
 
         bitmap = Bitmap.createBitmap(
             bitmap,
