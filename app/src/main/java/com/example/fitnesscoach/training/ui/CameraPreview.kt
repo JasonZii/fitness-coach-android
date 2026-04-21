@@ -11,7 +11,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.fitnesscoach.core.camera.CameraController
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 import com.example.fitnesscoach.training.pose.PoseFrameProcessor
-import java.util.concurrent.atomic.AtomicInteger
 
 @Composable
 fun CameraPreview(
@@ -22,7 +21,6 @@ fun CameraPreview(
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraController = remember { CameraController(context) }
     val frameProcessor = remember { PoseFrameProcessor(context) }
-    val frameCounter = remember { AtomicInteger(0) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -42,13 +40,6 @@ fun CameraPreview(
                     previewView = this,
                     lifecycleOwner = lifecycleOwner,
                     onFrameAvailable = { imageProxy ->
-                        val currentFrame = frameCounter.incrementAndGet()
-
-                        if (currentFrame % 3 != 0) {
-                            imageProxy.close()
-                            return@startCamera
-                        }
-
                         frameProcessor.processFrame(
                             imageProxy = imageProxy,
                             timestampMs = System.currentTimeMillis(),

@@ -53,6 +53,24 @@ object PoseScoringEngine {
     */
     data class Limb(val start: Int, val end: Int, val useMidpoint: Boolean = false)
 
+    // Maps each joint index to the limb indices it belongs to.
+    // Joints not listed here (e.g. face, hands, feet) have no connected scored limb → always green.
+    // Spine (limb 12) treats joints 11, 12, 23, 24 as its endpoints via midpoint logic.
+    private val JOINT_LIMB_MAP: Map<Int, List<Int>> = mapOf(
+        11 to listOf(0, 4, 10, 12),  // left shoulder
+        12 to listOf(2, 5, 10, 12),  // right shoulder
+        13 to listOf(0, 1),           // left elbow
+        14 to listOf(2, 3),           // right elbow
+        15 to listOf(1),              // left wrist
+        16 to listOf(3),              // right wrist
+        23 to listOf(4, 6, 11, 12),  // left hip
+        24 to listOf(5, 7, 11, 12),  // right hip
+        25 to listOf(6, 8),           // left knee
+        26 to listOf(7, 9),           // right knee
+        27 to listOf(8),              // left ankle
+        28 to listOf(9),              // right ankle
+    )
+
     // 13条肢体定义
     private val limbs = listOf(
         Limb(11, 13), // 0 Left upper arm 左上臂：左肩 → 左肘
@@ -115,13 +133,17 @@ object PoseScoringEngine {
         // Step 3: overall score  综合分 sf = SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2
         val sf = (SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2).coerceIn(0f, 100f)
 
-        // Step 4: colors — SCORE_RED_THRESHOLD (80) is the threshold from ALGORITHM.md §Module 3
-        val jointColors = jointScores.map { score ->
+        // Step 4: colors — limb scores drive both limb and joint colors.
+        // A joint is red when any of its connected limbs scores below the threshold,
+        // so users see a continuous red segment rather than isolated red dots.
+        // Joints with no connected scored limb (face, hands, feet) default to green.
+        val limbColors = limbScores.map { score ->
             if (score < SCORE_RED_THRESHOLD) RED else GREEN
         }
 
-        val limbColors = limbScores.map { score ->
-            if (score < SCORE_RED_THRESHOLD) RED else GREEN
+        val jointColors = (0 until LANDMARK_COUNT).map { jointIdx ->
+            val connectedLimbs = JOINT_LIMB_MAP[jointIdx]
+            if (connectedLimbs != null && connectedLimbs.any { limbIdx -> limbScores[limbIdx] < SCORE_RED_THRESHOLD }) RED else GREEN
         }
 
         //返回最终结果

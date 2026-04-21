@@ -7,7 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 import com.example.fitnesscoach.exercise.data.exerciseList
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
 import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
+import kotlin.math.sqrt
 import com.example.fitnesscoach.training.core.RepScoreTracker
 import com.example.fitnesscoach.training.domain.CountRepsUseCase
 import com.example.fitnesscoach.training.data.loadRawReferenceSequence
@@ -225,7 +230,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     // ── Readiness phase ───────────────────────────────────────────────────────
 
     private fun processReadinessFrame(poseResult: PoseResult) {
-        val fullBody = isFullBodyInFrame(poseResult.visibilities)
+        val fullBody = isFullBodyInFrame(poseResult.visibilities, requiredCameraAngle)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
         val conditionsMet = fullBody && angle == requiredCameraAngle
@@ -237,7 +242,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // Initialise the end-detector baseline on the first TRAINING frame.
         if (nextPhase == SessionPhase.TRAINING) {
-            endDetector.onTrainingStart(poseResult.landmarks)
+            endDetector.onTrainingStart(poseResult.landmarks, requiredCameraAngle)
         }
 
         _uiState.update { state ->
@@ -299,8 +304,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Step 4 — accumulate this frame's score for the current rep.
         // hasRedJoint is computed here so it can be forwarded to RepScoreTracker for
         // the correct/incorrect rep classification (continuous red-frame threshold).
-        val hasRedJoint = scoreResult.jointColors.any { it == Color.Red }
-        repScoreTracker.addFrameScore(scoreResult.sf, hasRedJoint)
+        val hasRedLimb = scoreResult.limbColors.any { it == Color.Red }
+        repScoreTracker.addFrameScore(scoreResult.sf, hasRedLimb)
 
         // Step 5 — rep detection (Module 4)
         val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
@@ -313,10 +318,12 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             _uiState.value.repScores             // no change
         }
 
-        // Expose the matched standard frame's raw landmarks only when at least one
-        // joint is red — the UI can use this to render a "ghost" target skeleton.
-        val matchedRaw = if (hasRedJoint && matchedIdx != -1)
-            rawReferenceSequence[matchedIdx] else emptyList()
+        // Expose the matched standard frame's landmarks only when at least one limb is red.
+        // Reposition the reference frame onto the live user's body centre and scale so the
+        // ghost skeleton overlays the user regardless of recording distance or position.
+        val matchedRaw = if (hasRedLimb && matchedIdx != -1)
+            repositionReference(rawReferenceSequence[matchedIdx], poseResult.landmarks)
+        else emptyList()
 
         _uiState.update { state ->
             state.copy(
@@ -330,6 +337,45 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 correctReps                  = repScoreTracker.correctReps,
                 incorrectReps                = repScoreTracker.incorrectReps,
                 isTrainingPaused             = false,
+            )
+        }
+    }
+
+    /**
+     * Repositions raw reference landmarks onto the live user's body centre and scale.
+     *
+     * The reference JSON was recorded at an arbitrary camera distance and position.
+     * Displaying those absolute coordinates directly would place the ghost skeleton
+     * at the wrong height and scale relative to the live user.
+     *
+     * Steps:
+     *   1. Normalise the reference frame (hip-centred, torso-scaled) — same as M1.
+     *   2. Denormalise using the live user's hip midpoint and torso length so the
+     *      ghost skeleton is anchored to the user's body on screen.
+     */
+    private fun repositionReference(
+        refRaw: List<Triple<Float, Float, Float>>,
+        userRaw: List<Triple<Float, Float, Float>>,
+    ): List<Triple<Float, Float, Float>> {
+        val normalizedRef = normalizeLandmarks(refRaw)
+
+        val userHipMidX = (userRaw[LANDMARK_LEFT_HIP].first  + userRaw[LANDMARK_RIGHT_HIP].first)  / 2f
+        val userHipMidY = (userRaw[LANDMARK_LEFT_HIP].second + userRaw[LANDMARK_RIGHT_HIP].second) / 2f
+        val userShoulderMidX = (userRaw[LANDMARK_LEFT_SHOULDER].first  + userRaw[LANDMARK_RIGHT_SHOULDER].first)  / 2f
+        val userShoulderMidY = (userRaw[LANDMARK_LEFT_SHOULDER].second + userRaw[LANDMARK_RIGHT_SHOULDER].second) / 2f
+
+        val userTorsoLen = sqrt(
+            (userShoulderMidX - userHipMidX) * (userShoulderMidX - userHipMidX) +
+            (userShoulderMidY - userHipMidY) * (userShoulderMidY - userHipMidY)
+        )
+
+        if (userTorsoLen < 1e-6f) return refRaw
+
+        return normalizedRef.map { (nx, ny) ->
+            Triple(
+                nx * userTorsoLen + userHipMidX,
+                ny * userTorsoLen + userHipMidY,
+                0f,
             )
         }
     }

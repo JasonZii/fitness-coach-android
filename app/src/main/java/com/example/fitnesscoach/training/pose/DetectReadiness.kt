@@ -15,20 +15,12 @@ import com.example.fitnesscoach.core.util.Constants.VISIBILITY_IN_FRAME_MIN
 import kotlin.math.acos
 import kotlin.math.sqrt
 
-/**
- * Landmark indices required for the full-body-in-frame check (ALGORITHM.md Module 5).
- * All nine must have visibility > VISIBILITY_IN_FRAME_MIN to pass.
- */
-private val FULL_BODY_LANDMARK_INDICES = intArrayOf(
-    LANDMARK_NOSE,
-    LANDMARK_LEFT_SHOULDER,
-    LANDMARK_RIGHT_SHOULDER,
-    LANDMARK_LEFT_HIP,
-    LANDMARK_RIGHT_HIP,
-    LANDMARK_LEFT_KNEE,
-    LANDMARK_RIGHT_KNEE,
-    LANDMARK_LEFT_ANKLE,
-    LANDMARK_RIGHT_ANKLE,
+// Bilateral landmark pairs (left, right) — shoulder / hip / knee / ankle
+private val BILATERAL_PAIRS = listOf(
+    LANDMARK_LEFT_SHOULDER to LANDMARK_RIGHT_SHOULDER,
+    LANDMARK_LEFT_HIP      to LANDMARK_RIGHT_HIP,
+    LANDMARK_LEFT_KNEE     to LANDMARK_RIGHT_KNEE,
+    LANDMARK_LEFT_ANKLE    to LANDMARK_RIGHT_ANKLE,
 )
 
 /**
@@ -45,19 +37,31 @@ enum class CameraAngle {
 }
 
 /**
- * Returns true when all key body landmarks are visible in the frame.
+ * Returns true when key body landmarks are visible in the frame.
  *
- * Checks MediaPipe visibility scores for landmark indices 0, 11, 12, 23, 24, 25, 26, 27, 28.
- * Every checked landmark must have a visibility score strictly greater than
- * [VISIBILITY_IN_FRAME_MIN] (0.5). See ALGORITHM.md Module 5.
+ * The check is adapted to the required camera angle:
+ * - SIDE view: nose + at least one landmark of each bilateral pair (shoulder/hip/knee/ankle).
+ *   MediaPipe assigns low visibility to the far-side joints when the body is sideways, so
+ *   requiring both sides would always fail.
+ * - FRONT / AMBIGUOUS: nose + both landmarks of every bilateral pair must exceed the threshold.
  *
- * @param visibilities Per-landmark visibility scores as output by MediaPipe.
- *                     Index matches the MediaPipe BlazePose landmark index (0–32).
- *                     The list must contain at least 29 elements (up to index 28).
- * @return true if every required landmark has visibility > 0.5; false otherwise.
+ * @param visibilities       Per-landmark visibility scores (MediaPipe BlazePose, index 0–32).
+ * @param requiredCameraAngle The angle mandated by the current exercise.
+ * @return true if the full-body condition is satisfied for the given angle.
  */
-fun isFullBodyInFrame(visibilities: List<Float>): Boolean {
-    return FULL_BODY_LANDMARK_INDICES.all { idx -> visibilities[idx] > VISIBILITY_IN_FRAME_MIN }
+fun isFullBodyInFrame(visibilities: List<Float>, requiredCameraAngle: CameraAngle): Boolean {
+    if (visibilities[LANDMARK_NOSE] <= VISIBILITY_IN_FRAME_MIN) return false
+    return if (requiredCameraAngle == CameraAngle.SIDE) {
+        // Side view: at least one side of each bilateral pair must be visible
+        BILATERAL_PAIRS.all { (left, right) ->
+            visibilities[left] > VISIBILITY_IN_FRAME_MIN || visibilities[right] > VISIBILITY_IN_FRAME_MIN
+        }
+    } else {
+        // Front / Ambiguous: both sides of every pair must be visible
+        BILATERAL_PAIRS.all { (left, right) ->
+            visibilities[left] > VISIBILITY_IN_FRAME_MIN && visibilities[right] > VISIBILITY_IN_FRAME_MIN
+        }
+    }
 }
 
 /**

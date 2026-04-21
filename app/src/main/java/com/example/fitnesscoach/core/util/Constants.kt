@@ -47,6 +47,8 @@ object Constants {
     const val CAMERA_ANGLE_SIDE_MAX = 60f
     // Both readiness conditions must hold this many seconds before countdown
     const val READINESS_HOLD_SECONDS = 3
+    // Grace period (ms) before a broken condition resets the countdown — absorbs MediaPipe noise
+    const val READINESS_GRACE_MS = 400L
 
     // State machine thresholds — Squat (squat, ALGORITHM.md Module 4)
     const val SQUAT_S1_ANGLE = 160f   // standing straight;    angle ≥ this → S1 territory
