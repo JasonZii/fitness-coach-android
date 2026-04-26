@@ -2,6 +2,7 @@ package com.example.fitnesscoach.exercise.data
 
 import com.example.fitnesscoach.R
 import com.example.fitnesscoach.training.pose.CameraAngle
+import com.example.fitnesscoach.training.pose.ReadinessVisibilityMode
 
 data class ExerciseInfo(
     val id: String,
@@ -13,6 +14,8 @@ data class ExerciseInfo(
     val jsonFileName: String,
     /** Camera angle the user must stand at before the readiness countdown begins. */
     val requiredCameraAngle: CameraAngle,
+    /** Landmark-visibility rule used by the readiness gate before recording starts. */
+    val readinessVisibilityMode: ReadinessVisibilityMode,
 )
 
 val exerciseList = listOf(
@@ -35,6 +38,7 @@ val exerciseList = listOf(
         videoRes = R.raw.squat,
         jsonFileName = "squat.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
         id = "dumbbell_lateral_raise",
@@ -55,6 +59,7 @@ val exerciseList = listOf(
         videoRes = R.raw.dumbbell_lateral_raise,
         jsonFileName = "dumbbell_lateral_raise.json",
         requiredCameraAngle = CameraAngle.FRONT,
+        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
     ),
     ExerciseInfo(
         id = "bicep_curl",
@@ -75,6 +80,7 @@ val exerciseList = listOf(
         videoRes = R.raw.bicep_curl,
         jsonFileName = "bicep_curl.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
         id = "right_leg_lunge_to_knee_raise",
@@ -95,6 +101,7 @@ val exerciseList = listOf(
         videoRes = R.raw.right_leg_lunge_to_knee_raise,
         jsonFileName = "right_leg_lunge_to_knee_raise.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
         id = "standing_dumbbell_shoulder_press",
@@ -114,5 +121,6 @@ val exerciseList = listOf(
         videoRes = R.raw.standing_dumbbell_shoulder_press,
         jsonFileName = "standing_dumbbell_shoulder_press.json",
         requiredCameraAngle = CameraAngle.FRONT,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
 )

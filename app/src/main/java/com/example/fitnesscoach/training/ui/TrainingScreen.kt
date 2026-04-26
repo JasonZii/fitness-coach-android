@@ -233,9 +233,9 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
                     // ── Full-body visibility status ───────────────────────────
                     ReadinessCheckRow(
                         satisfied       = uiState.isFullBodyInFrame,
-                        satisfiedText   = "Full body visible",
-                        unsatisfiedText = "Ensure your full body is visible",
-                        unsatisfiedColor = Color(0xFFFF6B6B),   // red — more urgent
+                        satisfiedText   = "Body landmarks visible",
+                        unsatisfiedText = "Ensure your body landmarks stay visible",
+                        unsatisfiedColor = Color(0xFFFF6B6B),   // red – more urgent
                     )
                 }
 

@@ -21,6 +21,7 @@ import com.example.fitnesscoach.training.pose.CameraAngle
 import com.example.fitnesscoach.training.pose.ReadinessPhase
 import com.example.fitnesscoach.training.pose.ReadinessState
 import com.example.fitnesscoach.training.pose.ReadinessStateMachine
+import com.example.fitnesscoach.training.pose.ReadinessVisibilityMode
 import com.example.fitnesscoach.training.pose.TrainingEndDetector
 import com.example.fitnesscoach.training.pose.TrainingPauseState
 import com.example.fitnesscoach.training.pose.alignOeDtw
@@ -62,7 +63,7 @@ data class TrainingUiState(
     // ── Readiness ─────────────────────────────────────────────────────────────
     /** ReadinessStateMachine snapshot; drives countdown digit display. */
     val readiness: ReadinessState = ReadinessState(ReadinessPhase.NOT_READY),
-    /** True when all 9 key landmarks exceed the visibility threshold. */
+    /** True when the configured readiness visibility rule is satisfied. */
     val isFullBodyInFrame: Boolean = false,
     /** Camera angle as classified by detectCameraAngle(); shown as a user hint. */
     val cameraAngle: CameraAngle = CameraAngle.AMBIGUOUS,
@@ -154,6 +155,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     // ── Required camera angle for the current exercise ─────────────────────────
     @Volatile private var requiredCameraAngle: CameraAngle = CameraAngle.SIDE
+    @Volatile private var readinessVisibilityMode: ReadinessVisibilityMode =
+        ReadinessVisibilityMode.ANY_VISIBLE_SIDE
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -195,6 +198,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         countRepsUseCase = CountRepsUseCase(info.id)
         wasTrainingPaused = false
         requiredCameraAngle = info.requiredCameraAngle
+        readinessVisibilityMode = info.readinessVisibilityMode
 
         _uiState.value = TrainingUiState(
             requiredCameraAngle = info.requiredCameraAngle,
@@ -230,7 +234,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     // ── Readiness phase ───────────────────────────────────────────────────────
 
     private fun processReadinessFrame(poseResult: PoseResult) {
-        val fullBody = isFullBodyInFrame(poseResult.visibilities, requiredCameraAngle)
+        val fullBody = isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
         val conditionsMet = fullBody && angle == requiredCameraAngle

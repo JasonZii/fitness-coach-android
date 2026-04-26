@@ -42,9 +42,9 @@ object Constants {
     // Minimum per-landmark visibility score for full-body-in-frame check
     const val VISIBILITY_IN_FRAME_MIN = 0.5f
     // theta (nose–shoulder–shoulder angle) above this value → front view
-    const val CAMERA_ANGLE_FRONT_MIN = 150f
+    const val CAMERA_ANGLE_FRONT_SPREAD_RATIO_MIN = 0.65f
     // theta below this value → side view
-    const val CAMERA_ANGLE_SIDE_MAX = 60f
+    const val CAMERA_ANGLE_SIDE_SPREAD_RATIO_MAX = 0.25f
     // Both readiness conditions must hold this many seconds before countdown
     const val READINESS_HOLD_SECONDS = 3
     // Grace period (ms) before a broken condition resets the countdown — absorbs MediaPipe noise
