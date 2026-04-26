@@ -3,6 +3,16 @@ package com.example.fitnesscoach.exercise.data
 import com.example.fitnesscoach.R
 import com.example.fitnesscoach.training.pose.CameraAngle
 import com.example.fitnesscoach.training.pose.ReadinessVisibilityMode
+import com.example.fitnesscoach.training.pose.SideViewDirection
+
+enum class KeyBodyPart {
+    SHOULDERS,
+    ELBOWS,
+    WRISTS,
+    HIPS,
+    KNEES,
+    ANKLES,
+}
 
 data class ExerciseInfo(
     val id: String,
@@ -14,6 +24,12 @@ data class ExerciseInfo(
     val jsonFileName: String,
     /** Camera angle the user must stand at before the readiness countdown begins. */
     val requiredCameraAngle: CameraAngle,
+    /** Whether readiness requires the configured full-body visibility check. */
+    val requiresFullBody: Boolean,
+    /** Expected left/right facing direction for side-view reference videos. */
+    val requiredSideViewDirection: SideViewDirection = SideViewDirection.NONE,
+    /** Body-part groups that should be prioritised by exercise-specific scoring/alignment. */
+    val keyBodyParts: Set<KeyBodyPart>,
     /** Landmark-visibility rule used by the readiness gate before recording starts. */
     val readinessVisibilityMode: ReadinessVisibilityMode,
 )
@@ -38,6 +54,9 @@ val exerciseList = listOf(
         videoRes = R.raw.squat,
         jsonFileName = "squat.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        requiresFullBody = true,
+        requiredSideViewDirection = SideViewDirection.RIGHT,
+        keyBodyParts = setOf(KeyBodyPart.HIPS, KeyBodyPart.KNEES, KeyBodyPart.ANKLES),
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
@@ -59,6 +78,9 @@ val exerciseList = listOf(
         videoRes = R.raw.dumbbell_lateral_raise,
         jsonFileName = "dumbbell_lateral_raise.json",
         requiredCameraAngle = CameraAngle.FRONT,
+        requiresFullBody = true,
+        requiredSideViewDirection = SideViewDirection.NONE,
+        keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
         readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
     ),
     ExerciseInfo(
@@ -80,6 +102,9 @@ val exerciseList = listOf(
         videoRes = R.raw.bicep_curl,
         jsonFileName = "bicep_curl.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        requiresFullBody = false,
+        requiredSideViewDirection = SideViewDirection.RIGHT,
+        keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
@@ -101,6 +126,9 @@ val exerciseList = listOf(
         videoRes = R.raw.right_leg_lunge_to_knee_raise,
         jsonFileName = "right_leg_lunge_to_knee_raise.json",
         requiredCameraAngle = CameraAngle.SIDE,
+        requiresFullBody = true,
+        requiredSideViewDirection = SideViewDirection.RIGHT,
+        keyBodyParts = setOf(KeyBodyPart.HIPS, KeyBodyPart.KNEES, KeyBodyPart.ANKLES),
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
@@ -121,6 +149,9 @@ val exerciseList = listOf(
         videoRes = R.raw.standing_dumbbell_shoulder_press,
         jsonFileName = "standing_dumbbell_shoulder_press.json",
         requiredCameraAngle = CameraAngle.FRONT,
-        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
+        requiresFullBody = false,
+        requiredSideViewDirection = SideViewDirection.NONE,
+        keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
+        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
     ),
 )

@@ -31,6 +31,13 @@ enum class CameraAngle {
     AMBIGUOUS,
 }
 
+enum class SideViewDirection {
+    LEFT,
+    RIGHT,
+    UNKNOWN,
+    NONE,
+}
+
 /**
  * Visibility rule used by the readiness gate before recording starts.
  */
@@ -105,5 +112,27 @@ fun detectCameraAngle(landmarks: List<Triple<Float, Float, Float>>): CameraAngle
         spreadRatio >= CAMERA_ANGLE_FRONT_SPREAD_RATIO_MIN -> CameraAngle.FRONT
         spreadRatio <= CAMERA_ANGLE_SIDE_SPREAD_RATIO_MAX -> CameraAngle.SIDE
         else -> CameraAngle.AMBIGUOUS
+    }
+}
+
+fun detectSideViewDirection(landmarks: List<Triple<Float, Float, Float>>): SideViewDirection {
+    val nose = landmarks[LANDMARK_NOSE]
+    val leftShoulder = landmarks[LANDMARK_LEFT_SHOULDER]
+    val rightShoulder = landmarks[LANDMARK_RIGHT_SHOULDER]
+    val leftHip = landmarks[LANDMARK_LEFT_HIP]
+    val rightHip = landmarks[LANDMARK_RIGHT_HIP]
+
+    val torsoCenterX = (
+        leftShoulder.first +
+            rightShoulder.first +
+            leftHip.first +
+            rightHip.first
+        ) / 4f
+    val noseOffsetX = nose.first - torsoCenterX
+
+    return when {
+        noseOffsetX <= -0.04f -> SideViewDirection.LEFT
+        noseOffsetX >= 0.04f -> SideViewDirection.RIGHT
+        else -> SideViewDirection.UNKNOWN
     }
 }
