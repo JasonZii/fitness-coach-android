@@ -1,25 +1,35 @@
 package com.example.fitnesscoach.training.data
 
 import android.content.Context
+import com.example.fitnesscoach.core.util.Constants.REFERENCE_POSE_DOWNSAMPLE_STEP
 import com.example.fitnesscoach.training.pose.normalizeLandmarks
 import org.json.JSONObject
 
 /**
- * Parses a raw JSON string (landmarks file from assets/) into a sequence of
- * raw MediaPipe frames. Pure function — no Android dependencies.
+ * Parses a raw JSON string (landmarks file from assets/) into a downsampled
+ * sequence of raw MediaPipe frames.
  *
  * JSON format (ALGORITHM.md §Standard Action Data):
  * ```json
  * { "frames": [ { "landmarks": [ {"x":…, "y":…, "z":…}, … ] }, … ] }
  * ```
  *
+ * Reference files are recorded at 60 FPS; the device analyses at ~15–30 FPS.
+ * [step] sub-samples the reference by keeping only every Nth frame, bringing it
+ * to ~30 FPS and preventing the "one-to-many" DTW stretch that wastes CPU and
+ * causes blue-skeleton lag on screen.
+ *
  * @param json Full text of a landmarks JSON file.
- * @return List of frames; each frame is a list of 33 raw (x, y, z) triples.
- *         Index matches the MediaPipe BlazePose landmark index (0–32).
+ * @param step Keep 1 frame every [step] frames (default [REFERENCE_POSE_DOWNSAMPLE_STEP] = 2).
+ * @return Downsampled list of frames; each frame is a list of 33 raw (x, y, z)
+ *         triples. Index matches the MediaPipe BlazePose landmark index (0–32).
  */
-fun parseReferencePoseJson(json: String): List<List<Triple<Float, Float, Float>>> {
+fun parseReferencePoseJson(
+    json: String,
+    step: Int = REFERENCE_POSE_DOWNSAMPLE_STEP,
+): List<List<Triple<Float, Float, Float>>> {
     val framesArray = JSONObject(json).getJSONArray("frames")
-    return List(framesArray.length()) { fi ->
+    return (0 until framesArray.length() step step).map { fi ->
         val landmarksArray = framesArray.getJSONObject(fi).getJSONArray("landmarks")
         List(landmarksArray.length()) { li ->
             val lm = landmarksArray.getJSONObject(li)
@@ -33,8 +43,17 @@ fun parseReferencePoseJson(json: String): List<List<Triple<Float, Float, Float>>
 }
 
 /**
+ * Files already recorded at ~30 FPS that must NOT be downsampled.
+ * All other files are assumed to be 60 FPS and use [REFERENCE_POSE_DOWNSAMPLE_STEP].
+ */
+private val ALREADY_30FPS = setOf("dumbbell_lateral_raise.json")
+
+private fun stepFor(assetFileName: String): Int =
+    if (assetFileName in ALREADY_30FPS) 1 else REFERENCE_POSE_DOWNSAMPLE_STEP
+
+/**
  * Loads a standard-action landmarks JSON from assets/ and returns the raw,
- * unnormalised frame sequence.
+ * unnormalised downsampled frame sequence.
  *
  * Use this when you need the original MediaPipe coordinates, e.g. to render a
  * "ghost skeleton" overlay showing the target pose on the camera preview.
@@ -46,18 +65,19 @@ fun parseReferencePoseJson(json: String): List<List<Triple<Float, Float, Float>>
  */
 fun loadRawReferenceSequence(
     context: Context,
-    assetFileName: String
+    assetFileName: String,
 ): List<List<Triple<Float, Float, Float>>> {
     val json = context.assets
         .open("landmarks/$assetFileName")
         .bufferedReader()
         .readText()
-    return parseReferencePoseJson(json)
+    return parseReferencePoseJson(json, stepFor(assetFileName))
 }
 
 /**
  * Loads a standard-action landmarks JSON from assets/, normalises every frame
- * with [normalizeLandmarks], and returns the result ready for [alignOeDtw].
+ * with [normalizeLandmarks], and returns the downsampled result ready for
+ * [alignOeDtw].
  *
  * Called once at training startup per ALGORITHM.md §Module 1 (Context 1).
  *
@@ -68,11 +88,11 @@ fun loadRawReferenceSequence(
  */
 fun loadReferenceSequence(
     context: Context,
-    assetFileName: String
+    assetFileName: String,
 ): List<List<Pair<Float, Float>>> {
     val json = context.assets
         .open("landmarks/$assetFileName")
         .bufferedReader()
         .readText()
-    return parseReferencePoseJson(json).map { normalizeLandmarks(it) }
+    return parseReferencePoseJson(json, stepFor(assetFileName)).map { normalizeLandmarks(it) }
 }
