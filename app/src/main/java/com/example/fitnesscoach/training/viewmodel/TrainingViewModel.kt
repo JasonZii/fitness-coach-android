@@ -1,6 +1,7 @@
 package com.example.fitnesscoach.training.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,10 +22,13 @@ import com.example.fitnesscoach.training.pose.CameraAngle
 import com.example.fitnesscoach.training.pose.ReadinessPhase
 import com.example.fitnesscoach.training.pose.ReadinessState
 import com.example.fitnesscoach.training.pose.ReadinessStateMachine
+import com.example.fitnesscoach.training.pose.ReadinessVisibilityMode
+import com.example.fitnesscoach.training.pose.SideViewDirection
 import com.example.fitnesscoach.training.pose.TrainingEndDetector
 import com.example.fitnesscoach.training.pose.TrainingPauseState
 import com.example.fitnesscoach.training.pose.alignOeDtw
 import com.example.fitnesscoach.training.pose.detectCameraAngle
+import com.example.fitnesscoach.training.pose.detectSideViewDirection
 import com.example.fitnesscoach.training.pose.isFullBodyInFrame
 import com.example.fitnesscoach.training.pose.normalizeLandmarks
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +38,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val CAMERA_DIRECTION_WARNING_GRACE_MS = 1500L
+private const val DIRECTION_DEBUG_TAG = "DIRECTION_DEBUG"
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -62,12 +69,16 @@ data class TrainingUiState(
     // ── Readiness ─────────────────────────────────────────────────────────────
     /** ReadinessStateMachine snapshot; drives countdown digit display. */
     val readiness: ReadinessState = ReadinessState(ReadinessPhase.NOT_READY),
-    /** True when all 9 key landmarks exceed the visibility threshold. */
+    /** True when the configured readiness visibility rule is satisfied. */
     val isFullBodyInFrame: Boolean = false,
     /** Camera angle as classified by detectCameraAngle(); shown as a user hint. */
     val cameraAngle: CameraAngle = CameraAngle.AMBIGUOUS,
     /** Camera angle required by the selected exercise (SIDE for squat/lunge, FRONT otherwise). */
     val requiredCameraAngle: CameraAngle = CameraAngle.SIDE,
+    /** Whether readiness requires the configured full-body visibility check. */
+    val requiresFullBody: Boolean = true,
+    /** True after the camera angle has been wrong continuously during training. */
+    val isCameraDirectionWarningVisible: Boolean = false,
 
     // ── Skeleton overlay (valid in both phases once landmarks arrive) ──────────
     /** Raw MediaPipe (x, y, z) triples passed directly to SkeletonOverlay. */
@@ -141,9 +152,11 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private val endDetector      = TrainingEndDetector()
     // CountRepsUseCase is exercise-specific; reassigned in loadExercise().
     private var countRepsUseCase = CountRepsUseCase()
+    private var currentExerciseId: String = "squat"
 
     /** Tracks the previous frame's pause state to detect ACTIVE→PAUSED transitions. */
     private var wasTrainingPaused = false
+    private var cameraDirectionMismatchSinceMs: Long? = null
 
     // ── Reference sequences (set once from IO thread, read on main thread) ──────
     @Volatile private var referenceSequence:    List<List<Pair<Float, Float>>>          = emptyList()
@@ -154,6 +167,10 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     // ── Required camera angle for the current exercise ─────────────────────────
     @Volatile private var requiredCameraAngle: CameraAngle = CameraAngle.SIDE
+    @Volatile private var requiresFullBody: Boolean = true
+    @Volatile private var requiredSideViewDirection: SideViewDirection = SideViewDirection.NONE
+    @Volatile private var readinessVisibilityMode: ReadinessVisibilityMode =
+        ReadinessVisibilityMode.ANY_VISIBLE_SIDE
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -193,11 +210,17 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         repScoreTracker.reset()
         userSequence.clear()
         countRepsUseCase = CountRepsUseCase(info.id)
+        currentExerciseId = info.id
         wasTrainingPaused = false
+        cameraDirectionMismatchSinceMs = null
         requiredCameraAngle = info.requiredCameraAngle
+        requiresFullBody = info.requiresFullBody
+        requiredSideViewDirection = info.requiredSideViewDirection
+        readinessVisibilityMode = info.readinessVisibilityMode
 
         _uiState.value = TrainingUiState(
             requiredCameraAngle = info.requiredCameraAngle,
+            requiresFullBody    = info.requiresFullBody,
             isReferenceLoaded   = false,
         )
 
@@ -225,12 +248,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         userSequence.clear()
         countRepsUseCase.reset()
         wasTrainingPaused = false
+        cameraDirectionMismatchSinceMs = null
     }
 
     // ── Readiness phase ───────────────────────────────────────────────────────
 
     private fun processReadinessFrame(poseResult: PoseResult) {
-        val fullBody = isFullBodyInFrame(poseResult.visibilities, requiredCameraAngle)
+        val fullBody = !requiresFullBody ||
+            isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
         val conditionsMet = fullBody && angle == requiredCameraAngle
@@ -262,11 +287,39 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Guard: skip frames that arrive before the reference sequence is ready.
         if (!_uiState.value.isReferenceLoaded) return
 
+        val angle = detectCameraAngle(poseResult.landmarks)
+        val sideViewDirection = if (angle == CameraAngle.SIDE) {
+            detectSideViewDirection(poseResult.landmarks)
+        } else {
+            SideViewDirection.UNKNOWN
+        }
+        val nowMs = System.currentTimeMillis()
+        val directionMismatch = requiredCameraAngle == CameraAngle.SIDE && (
+            angle == CameraAngle.FRONT ||
+                (
+                    angle == CameraAngle.SIDE &&
+                        requiredSideViewDirection != SideViewDirection.NONE &&
+                        sideViewDirection != SideViewDirection.UNKNOWN &&
+                        sideViewDirection != requiredSideViewDirection
+                    )
+            )
+        val showDirectionWarning = updateCameraDirectionWarning(directionMismatch, nowMs)
+        Log.d(
+            DIRECTION_DEBUG_TAG,
+            "exerciseId=$currentExerciseId, " +
+                "requiredCameraAngle=$requiredCameraAngle, " +
+                "cameraAngle=$angle, " +
+                "requiredSideViewDirection=$requiredSideViewDirection, " +
+                "detectedSideViewDirection=$sideViewDirection, " +
+                "warningMismatch=$directionMismatch, " +
+                "showDirectionWarning=$showDirectionWarning"
+        )
+
         // Step 0 — Module 6: check for auto-pause conditions (too close / low visibility).
         val pauseState = endDetector.update(
             poseResult.landmarks,
             poseResult.visibilities,
-            System.currentTimeMillis(),
+            nowMs,
         )
         val isPaused = pauseState == TrainingPauseState.PAUSED
 
@@ -283,6 +336,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             _uiState.update { state ->
                 state.copy(
                     landmarks        = poseResult.landmarks,
+                    cameraAngle      = angle,
+                    isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused = true,
                 )
             }
@@ -290,6 +345,18 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         }
 
         // Step 1 — normalise the live frame (ALGORITHM.md Module 1, Context 2)
+        if (directionMismatch) {
+            _uiState.update { state ->
+                state.copy(
+                    landmarks = poseResult.landmarks,
+                    cameraAngle = angle,
+                    isCameraDirectionWarningVisible = showDirectionWarning,
+                    isTrainingPaused = false,
+                )
+            }
+            return
+        }
+
         val normalized = normalizeLandmarks(poseResult.landmarks)
         userSequence.add(normalized)
 
@@ -328,6 +395,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { state ->
             state.copy(
                 landmarks                    = poseResult.landmarks,
+                cameraAngle                  = angle,
+                isCameraDirectionWarningVisible = showDirectionWarning,
                 jointColors                  = scoreResult.jointColors,
                 limbColors                   = scoreResult.limbColors,
                 currentFrameScore            = scoreResult.sf,
@@ -339,6 +408,18 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 isTrainingPaused             = false,
             )
         }
+    }
+
+    private fun updateCameraDirectionWarning(directionMismatch: Boolean, nowMs: Long): Boolean {
+        if (!directionMismatch) {
+            cameraDirectionMismatchSinceMs = null
+            return false
+        }
+
+        val mismatchSince = cameraDirectionMismatchSinceMs ?: nowMs.also {
+            cameraDirectionMismatchSinceMs = it
+        }
+        return nowMs - mismatchSince >= CAMERA_DIRECTION_WARNING_GRACE_MS
     }
 
     /**

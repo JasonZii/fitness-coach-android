@@ -259,25 +259,31 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
 
                     // ── Camera-angle status ───────────────────────────────────
                     val angleInstruction = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
-                        "Stand sideways to the camera"
+                        "Turn side-on and match the reference video direction"
                     else
                         "Face the camera"
+                    val angleReadyText = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
+                        "Side-on direction matches the reference video"
+                    else
+                        "Angle correct — $angleInstruction"
                     val angleMatched = uiState.cameraAngle == uiState.requiredCameraAngle
                     ReadinessCheckRow(
                         satisfied = angleMatched,
-                        satisfiedText  = "Angle correct — $angleInstruction",
+                        satisfiedText  = angleReadyText,
                         unsatisfiedText = angleInstruction,
                     )
 
                     Spacer(Modifier.height(6.dp))
 
                     // ── Full-body visibility status ───────────────────────────
-                    ReadinessCheckRow(
-                        satisfied       = uiState.isFullBodyInFrame,
-                        satisfiedText   = "Full body visible",
-                        unsatisfiedText = "Ensure your full body is visible",
-                        unsatisfiedColor = Color(0xFFFF6B6B),   // red — more urgent
-                    )
+                    if (uiState.requiresFullBody) {
+                        ReadinessCheckRow(
+                            satisfied       = uiState.isFullBodyInFrame,
+                            satisfiedText   = "Body landmarks visible",
+                            unsatisfiedText = "Ensure your body landmarks stay visible",
+                            unsatisfiedColor = Color(0xFFFF6B6B),   // red – more urgent
+                        )
+                    }
                 }
 
                 ReadinessPhase.COUNTDOWN -> {
@@ -333,6 +339,25 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+        }
+
+        if (uiState.isCameraDirectionWarningVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 72.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth()
+                    .background(Color(0xFFFF6F00).copy(alpha = 0.9f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Turn side-on and match the reference video direction.",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
 
         // Bottom-centre: stop button
