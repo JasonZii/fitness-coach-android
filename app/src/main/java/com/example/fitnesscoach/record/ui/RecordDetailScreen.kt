@@ -172,6 +172,9 @@ fun RecordDetailScreen(
                 Button(
                     onClick = {
                         record?.let {
+                            val exerciseId = it.exerciseId
+                            navController.popBackStack()
+
                             navController.navigate(Routes.training(it.exerciseId)) {
 //                                popUpTo(Routes.RECORD_DETAIL) { inclusive = true }
 
