@@ -38,36 +38,80 @@ fun FitnessBottomBar(navController: NavController) {
 //                    }
 //                },
 
+//                onClick = {
+//                    when (item.route) {
+//                        Routes.HOME -> {
+//                            navController.navigate(Routes.HOME) {
+//                                popUpTo(Routes.HOME) { inclusive = true }
+//                            }
+//                        }
+//
+//                        Routes.EXERCISE_LIBRARY -> {
+//                            val popped = navController.popBackStack(
+//                                route = Routes.EXERCISE_LIBRARY,
+//                                inclusive = false
+//                            )
+//
+//                            if (!popped) {
+//                                navController.navigate(Routes.EXERCISE_LIBRARY) {
+//                                    launchSingleTop = true
+//                                }
+//                            }
+//                        }
+//
+//                        else -> {
+//                            navController.navigate(item.route) {
+//                                popUpTo(Routes.HOME) { saveState = true }
+//                                launchSingleTop = true
+//                                restoreState = true
+//                            }
+//                        }
+//                    }
+//                },
+
                 onClick = {
-                    when (item.route) {
-                        Routes.HOME -> {
-                            navController.navigate(Routes.HOME) {
-                                popUpTo(Routes.HOME) { inclusive = true }
-                            }
+                    val current = navController.currentBackStackEntry?.destination?.route
+
+                    when {
+                        current == item.route -> {
+                            // already on this page
                         }
 
-                        Routes.EXERCISE_LIBRARY -> {
-                            val popped = navController.popBackStack(
+                        item.route == Routes.EXERCISE_LIBRARY &&
+                                current == Routes.EXERCISE_DETAIL_TEMPLATE -> {
+                            navController.popBackStack(
                                 route = Routes.EXERCISE_LIBRARY,
                                 inclusive = false
                             )
+                        }
 
-                            if (!popped) {
-                                navController.navigate(Routes.EXERCISE_LIBRARY) {
-                                    launchSingleTop = true
-                                }
+                        item.route == Routes.RECORD_LIST &&
+                                current?.startsWith(Routes.RECORD_DETAIL) == true -> {
+                            navController.popBackStack(
+                                route = Routes.RECORD_LIST,
+                                inclusive = false
+                            )
+                        }
+
+                        item.route == Routes.HOME -> {
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(Routes.HOME) { inclusive = true }
+                                launchSingleTop = true
                             }
                         }
 
                         else -> {
                             navController.navigate(item.route) {
-                                popUpTo(Routes.HOME) { saveState = true }
+                                popUpTo(Routes.HOME) {
+                                    saveState = false
+                                }
                                 launchSingleTop = true
-                                restoreState = true
+                                restoreState = false
                             }
                         }
                     }
                 },
+
                 label = { Text(item.title) },
                 icon = { Icon(item.icon, contentDescription = item.title) }
             )
