@@ -366,7 +366,10 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // Step 3 — score the frame and derive joint/limb colors (Module 3)
         // EvaluateExerciseUseCase returns all-green with sf=100 when matchedIdx == -1.
-        val scoreResult = evaluateUseCase.evaluate(matchedIdx, normalized, referenceSequence)
+        val scoreResult = evaluateUseCase.evaluate(
+            matchedIdx, normalized, referenceSequence,
+            upperBodyOnly = !requiresFullBody,
+        )
 
         // Step 4 — accumulate this frame's score for the current rep.
         // hasRedJoint is computed here so it can be forwarded to RepScoreTracker for

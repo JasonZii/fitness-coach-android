@@ -31,15 +31,19 @@ class EvaluateExerciseUseCase {
      *                               be green and sf will be 100.
      * @param userLandmarks          33 normalised (x, y) pairs for the current frame.
      * @param referenceSequence      Full normalised standard action sequence.
+     * @param upperBodyOnly          Pass `true` for exercises whose [ExerciseInfo.requiresFullBody]
+     *                               is false. Lower-body joints and limbs are excluded from scoring
+     *                               and forced green so they never pollute the score or UI.
      * @return [PoseScoreResult] with per-joint/limb colors, scores, and overall sf.
      */
     fun evaluate(
         matchedReferenceIndex: Int,
         userLandmarks: List<Pair<Float, Float>>,
-        referenceSequence: List<List<Pair<Float, Float>>>
+        referenceSequence: List<List<Pair<Float, Float>>>,
+        upperBodyOnly: Boolean = false,
     ): PoseScoreResult {
         if (matchedReferenceIndex == -1) return allGreenResult
         val referenceLandmarks = referenceSequence[matchedReferenceIndex]
-        return PoseScoringEngine.calculatePoseScore(userLandmarks, referenceLandmarks)
+        return PoseScoringEngine.calculatePoseScore(userLandmarks, referenceLandmarks, upperBodyOnly)
     }
 }

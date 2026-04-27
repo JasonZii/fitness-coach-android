@@ -28,7 +28,7 @@ object Constants {
 
     // Module 2: OE-DTW real-time alignment
     // Minimum user sequence length before alignment is considered stable
-    const val OE_DTW_MIN_FRAMES = 20
+    const val OE_DTW_MIN_FRAMES = 15
     // Reference JSON files are recorded at 60 FPS; device analysis runs at ~15–30 FPS.
     // Taking every Nth frame brings the reference down to ~30 FPS and eliminates
     // the "one-to-many" DTW stretch that wastes CPU and causes blue-skeleton lag.
@@ -36,7 +36,7 @@ object Constants {
 
     // Module 3: Per-landmark scoring
     // Joint/limb score below this threshold → RED; at or above → GREEN
-    const val SCORE_RED_THRESHOLD = 80f
+    const val SCORE_RED_THRESHOLD = 83f
     // Weight of joint-position score S1 in the overall frame score Sf
     const val SCORE_WEIGHT_S1 = 0.2f
     // Weight of limb-angle score S2 in the overall frame score Sf
@@ -67,7 +67,7 @@ object Constants {
     // State machine thresholds — Bicep Curl (bicep_curl)
     // Calibrated from reference JSON (197 frames): abs max 175.5°, abs min 34.3°; margin ±15°.
     const val BICEP_CURL_S1_ANGLE = 160f   // arm fully extended;  angle ≥ this → S1 territory
-    const val BICEP_CURL_S3_ANGLE = 50f    // curl peak;           angle ≤ this → S3 territory
+    const val BICEP_CURL_S3_ANGLE = 70f    // curl peak;           angle ≤ this → S3 territory
 
     // State machine thresholds — Standing Dumbbell Shoulder Press (standing_dumbbell_shoulder_press)
     // Calibrated from reference JSON (187 frames): abs min 39.4°, abs max 174.3°; margin ±15°.
@@ -81,7 +81,7 @@ object Constants {
 
     // Module 4: Rep correctness classification
     // A rep is CORRECT when the longest consecutive-red-frame run is ≤ this value (~0.25 s at 20 fps)
-    const val MAX_CONSECUTIVE_RED_FRAMES = 5
+    const val MAX_CONSECUTIVE_RED_FRAMES = 15
 
     // Module 6: Training end detection
     // Average visibility of key landmarks below this triggers pause

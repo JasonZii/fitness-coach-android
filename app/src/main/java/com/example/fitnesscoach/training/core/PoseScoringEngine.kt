@@ -53,6 +53,14 @@ object PoseScoringEngine {
     */
     data class Limb(val start: Int, val end: Int, val useMidpoint: Boolean = false)
 
+    // Limb indices that belong to the upper body (arms, torso lines, shoulder line, spine).
+    // When upperBodyOnly = true, only these are included in S2 and colour decisions.
+    private val UPPER_BODY_LIMB_INDICES = setOf(0, 1, 2, 3, 4, 5, 10, 12)
+
+    // Joint indices included in S1 when upperBodyOnly = true.
+    // Hips (23, 24) are included because they anchor the torso limbs and spine.
+    private val UPPER_BODY_JOINT_INDICES = setOf(11, 12, 13, 14, 15, 16, 23, 24)
+
     // Maps each joint index to the limb indices it belongs to.
     // Joints not listed here (e.g. face, hands, feet) have no connected scored limb → always green.
     // Spine (limb 12) treats joints 11, 12, 23, 24 as its endpoints via midpoint logic.
@@ -90,63 +98,69 @@ object PoseScoringEngine {
     )
 
     //核心函数
+    /**
+     * @param upperBodyOnly When true (exercises where [requiresFullBody] = false), S1 is
+     *   averaged over [UPPER_BODY_JOINT_INDICES] only, S2 over [UPPER_BODY_LIMB_INDICES] only,
+     *   and lower-body limbs/joints are forced green so they never penalise the score or
+     *   confuse the user with irrelevant red highlights.
+     */
     fun calculatePoseScore(
-        userLandmarks: List<Pair<Float, Float>>, //用户当前帧的 33 个关键点
-        referenceLandmarks: List<Pair<Float, Float>>  //参考标准帧的 33 个关键点
+        userLandmarks: List<Pair<Float, Float>>,
+        referenceLandmarks: List<Pair<Float, Float>>,
+        upperBodyOnly: Boolean = false,
     ): PoseScoreResult {
-        //校验
         require(userLandmarks.size == LANDMARK_COUNT) {
             "userLandmarks size must be $LANDMARK_COUNT"
         }
-        //校验
         require(referenceLandmarks.size == LANDMARK_COUNT) {
             "referenceLandmarks size must be $LANDMARK_COUNT"
         }
 
-        //把 Pair 转成 Point
         val user = userLandmarks.map { Point(it.first, it.second) }
         val ref = referenceLandmarks.map { Point(it.first, it.second) }
 
-        // 计算关节得分, 先算欧氏距离 dp = sqrt((x1-x2)^2 + (y1-y2)^2) 也就是用户点和参考点之间的距离。
-        // 再转成分数 距离越小 → 分数越高, 距离越大 → 分数越低
-        // Step 1: joint scores
+        // Step 1: joint position scores (all 33 computed; S1 averaged over active set only)
         val jointScores = (0 until LANDMARK_COUNT).map { p ->
             val dp = distance(user[p], ref[p])
-            ((1f - dp) * 100f).coerceIn(0f, 100f)  //把分数强制限制在 0~100 范围内
+            ((1f - dp) * 100f).coerceIn(0f, 100f)
+        }
+        val s1 = if (upperBodyOnly) {
+            UPPER_BODY_JOINT_INDICES.map { jointScores[it] }.average().toFloat()
+        } else {
+            jointScores.average().toFloat()
         }
 
-        //把 LANDMARK_COUNT 个关节分数求平均。
-        val s1 = jointScores.average().toFloat()
-
-        // Step 2: limb angle scores
-        val limbScores = limbs.mapIndexed { index, limb ->
-            val userVector = getLimbVector(user, limb) //1. 得到用户肢体向量
-            val refVector = getLimbVector(ref, limb) //2. 得到参考肢体向量
-
-            val angleDiff = angleBetween(userVector, refVector) // 0..180 //3. 算两个向量之间的夹角
-            ((1f - angleDiff / 180f) * 100f).coerceIn(0f, 100f) //角度转分数 夹角越小 → 动作越接近 → 分数越高; 夹角越大 → 动作差异越大 → 分数越低
+        // Step 2: limb angle scores (all 13 computed; S2 averaged over active set only)
+        val limbScores = limbs.mapIndexed { _, limb ->
+            val userVector = getLimbVector(user, limb)
+            val refVector = getLimbVector(ref, limb)
+            val angleDiff = angleBetween(userVector, refVector)
+            ((1f - angleDiff / 180f) * 100f).coerceIn(0f, 100f)
+        }
+        val s2 = if (upperBodyOnly) {
+            UPPER_BODY_LIMB_INDICES.map { limbScores[it] }.average().toFloat()
+        } else {
+            limbScores.average().toFloat()
         }
 
-        //肢体平均分,13 条 limb 的平均分
-        val s2 = limbScores.average().toFloat()
-
-        // Step 3: overall score  综合分 sf = SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2
+        // Step 3: overall score
         val sf = (SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2).coerceIn(0f, 100f)
 
         // Step 4: colors — limb scores drive both limb and joint colors.
-        // A joint is red when any of its connected limbs scores below the threshold,
-        // so users see a continuous red segment rather than isolated red dots.
-        // Joints with no connected scored limb (face, hands, feet) default to green.
-        val limbColors = limbScores.map { score ->
-            if (score < SCORE_RED_THRESHOLD) RED else GREEN
+        // When upperBodyOnly, lower-body limbs are always green and joint colours only
+        // consider their upper-body connected limbs, preventing misleading red highlights.
+        val limbColors = limbScores.mapIndexed { idx, score ->
+            if ((!upperBodyOnly || idx in UPPER_BODY_LIMB_INDICES) && score < SCORE_RED_THRESHOLD) RED else GREEN
         }
 
         val jointColors = (0 until LANDMARK_COUNT).map { jointIdx ->
             val connectedLimbs = JOINT_LIMB_MAP[jointIdx]
-            if (connectedLimbs != null && connectedLimbs.any { limbIdx -> limbScores[limbIdx] < SCORE_RED_THRESHOLD }) RED else GREEN
+            if (connectedLimbs != null && connectedLimbs.any { limbIdx ->
+                    (!upperBodyOnly || limbIdx in UPPER_BODY_LIMB_INDICES) &&
+                    limbScores[limbIdx] < SCORE_RED_THRESHOLD
+                }) RED else GREEN
         }
 
-        //返回最终结果
         return PoseScoreResult(
             jointColors = jointColors,
             limbColors = limbColors,
