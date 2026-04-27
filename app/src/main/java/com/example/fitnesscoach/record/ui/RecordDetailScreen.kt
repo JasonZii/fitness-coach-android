@@ -27,6 +27,8 @@ import com.example.fitnesscoach.exercise.data.exerciseList
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 import com.example.fitnesscoach.exercise.data.exerciseList
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,17 +90,26 @@ fun RecordDetailScreen(
         }
     ) { innerPadding ->
 
+//        Column(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(innerPadding)
+//                .padding(horizontal = 20.dp, vertical = 16.dp),
+//            horizontalAlignment = Alignment.CenterHorizontally
+//        ) {
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp),
+                    .height(180.dp),
                 shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
@@ -152,7 +163,7 @@ fun RecordDetailScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.weight(1f))
+//            Spacer(modifier = Modifier.weight(1f))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -184,6 +195,8 @@ fun RecordDetailScreen(
 //                }
             }
         }
+
+        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 
