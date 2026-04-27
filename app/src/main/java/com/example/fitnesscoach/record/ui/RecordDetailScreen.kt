@@ -23,6 +23,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.draw.clip
 import com.example.fitnesscoach.R
+import com.example.fitnesscoach.exercise.data.exerciseList
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.example.fitnesscoach.exercise.data.exerciseList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,14 +49,17 @@ fun RecordDetailScreen(
 
     var record by remember { mutableStateOf<TrainingRecordEntity?>(null) }
 
-    val imageRes = when (record?.exerciseId) {
-        "squat" -> R.drawable.squat
-        "dumbbell_lateral_raise" -> R.drawable.dumbbell_lateral_raise
-        "bicep_curl" -> R.drawable.bicep_curl
-        "right_leg_lunge_to_knee_raise" -> R.drawable.right_leg_lunge_to_knee_raise
-        "standing_dumbbell_shoulder_press" -> R.drawable.standing_dumbbell_shoulder_press
-        else -> null
-    }
+//    val imageRes = when (record?.exerciseId) {
+//        "squat" -> R.drawable.squat
+//        "dumbbell_lateral_raise" -> R.drawable.dumbbell_lateral_raise
+//        "bicep_curl" -> R.drawable.bicep_curl
+//        "right_leg_lunge_to_knee_raise" -> R.drawable.right_leg_lunge_to_knee_raise
+//        "standing_dumbbell_shoulder_press" -> R.drawable.standing_dumbbell_shoulder_press
+//        else -> null
+//    }
+
+    val exercise = exerciseList.find { it.id == record?.exerciseId }
+
 
     LaunchedEffect(recordId) {
         scope.launch(Dispatchers.IO) {
@@ -95,10 +102,11 @@ fun RecordDetailScreen(
                 shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                if (imageRes != null) {
+                if (exercise != null) {
                     Image(
-                        painter = painterResource(id = imageRes),
-                        contentDescription = record?.exerciseName ?: "Exercise Image",
+                        painter = painterResource(id = exercise.imageRes),
+//                        contentDescription = record?.exerciseName ?: "Exercise Image",
+                        contentDescription = exercise.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -133,7 +141,8 @@ fun RecordDetailScreen(
                         style = MaterialTheme.typography.titleLarge
                     )
 
-                    RecordInfoRow(label = "Exercise", value = record?.exerciseName ?: "--")
+//                    RecordInfoRow(label = "Exercise", value = record?.exerciseName ?: "--")
+                    RecordInfoRow(label = "Exercise", value = exercise?.title ?: record?.exerciseName ?: "--")
                     RecordInfoRow(label = "Score", value = record?.avgScore?.toString() ?: "--")
                     RecordInfoRow(label = "Repetition", value = record?.repCount?.toString() ?: "--")
                     RecordInfoRow(label = "Correct Counts", value = record?.correctReps?.toString() ?: "--")
@@ -155,7 +164,9 @@ fun RecordDetailScreen(
                             navController.navigate(Routes.training(it.exerciseId)) {
 //                                popUpTo(Routes.RECORD_DETAIL) { inclusive = true }
 
-                                popUpTo(Routes.RECORD_LIST) { saveState = true }
+//                                popUpTo(Routes.RECORD_LIST) { saveState = true }
+//                                launchSingleTop = true
+
                                 launchSingleTop = true
                             }
                         }
@@ -165,13 +176,12 @@ fun RecordDetailScreen(
                     Text("Try Again")
                 }
 
-                Button(
-//                    onClick = { navController.navigate(Routes.RECORD_LIST) },
-                    onClick = { navController.popBackStack() },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("History")
-                }
+//                Button(
+//                    onClick = { navController.popBackStack() },
+//                    modifier = Modifier.weight(1f)
+//                ) {
+//                    Text("History")
+//                }
             }
         }
     }

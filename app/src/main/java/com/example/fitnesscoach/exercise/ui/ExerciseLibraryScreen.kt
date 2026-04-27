@@ -42,9 +42,9 @@ fun ExerciseLibraryScreen(navController: NavHostController) {
                 style = MaterialTheme.typography.headlineSmall
             )
 
-            IconButton(onClick = { }) {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            }
+//            IconButton(onClick = { }) {
+//                Icon(Icons.Default.Search, contentDescription = "Search")
+//            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

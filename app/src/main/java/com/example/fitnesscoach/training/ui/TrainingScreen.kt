@@ -7,10 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +33,7 @@ import kotlinx.coroutines.launch
 import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
 import kotlinx.coroutines.withContext
+import com.example.fitnesscoach.exercise.data.exerciseList
 
 @Composable
 fun TrainingScreen(
@@ -46,6 +44,7 @@ fun TrainingScreen(
     val context = LocalContext.current
     val viewModel: TrainingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    var showReferenceSkeleton by remember { mutableStateOf(true) }
     val database = remember {
         Room.databaseBuilder(
             context,
@@ -101,12 +100,24 @@ fun TrainingScreen(
 
         // ── Layer 3: reference skeleton (blue, semi-transparent) ─────
         // Shown only when at least one joint is red (posture needs correction).
-        if (uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT) {
+//        if (uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT) {
+//            SkeletonOverlay(
+//                landmarks   = uiState.matchedReferenceRawLandmarks,
+//                jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+//                limbColors  = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+//                modifier    = Modifier.fillMaxSize()
+//            )
+//        }
+
+        if (
+            showReferenceSkeleton &&
+            uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT
+        ) {
             SkeletonOverlay(
-                landmarks   = uiState.matchedReferenceRawLandmarks,
+                landmarks = uiState.matchedReferenceRawLandmarks,
                 jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-                limbColors  = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-                modifier    = Modifier.fillMaxSize()
+                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+                modifier = Modifier.fillMaxSize()
             )
         }
 
@@ -118,10 +129,11 @@ fun TrainingScreen(
                     // Pop back to Library so the back stack is [HOME, exercise_library].
                     // If EXERCISE_LIBRARY is not in the back stack (e.g. deep-link entry),
                     // fall back to Home to avoid a silent no-op.
-                    val popped = navController.popBackStack(
-                        route     = Routes.EXERCISE_LIBRARY,
-                        inclusive = false,
-                    )
+//                    val popped = navController.popBackStack(
+//                        route     = Routes.EXERCISE_LIBRARY,
+//                        inclusive = false,
+//                    )
+                    val popped = navController.popBackStack()
                     if (!popped) {
                         navController.navigate(Routes.HOME) {
                             popUpTo(0) { inclusive = true }
@@ -140,28 +152,19 @@ fun TrainingScreen(
 
                     viewModel.stopTraining()
 
-//                    navController.navigate(
-////                        Routes.trainingResult(exerciseId, repCount, avgScore, correctReps, incorrectReps)
-//                        Routes.recordDetail(exerciseId = exerciseId,
-//                        repCount = repCount,
-//                        avgScore = avgScore,
-//                        correctReps = correctReps,
-//                        incorrectReps = incorrectReps
-//                    )
-//                    ) {
-//                        // Remove the training screen from the back stack so the user
-//                        // can navigate back normally to Library / Home from ResultScreen.
-//                        popUpTo(Routes.training(exerciseId)) { inclusive = true }
+//                    val exerciseName = when (exerciseId) {
+//                        "squat" -> "Squat"
+//                        "dumbbell_lateral_raise" -> "Dumbbell Lateral Raise"
+//                        "dumbbell_overhead_triceps_extension" -> "Dumbbell Overhead Triceps Extension"
+//                        "right_leg_lunge_to_knee_raise" -> "Right Leg Lunge To Knee Raise"
+//                        "standing_dumbbell_shoulder_press" -> "Standing Dumbbell Shoulder Press"
+//                        "bicep_curl" -> "Bicep Curl"
+//                        else -> "Unknown"
 //                    }
 
-                    val exerciseName = when (exerciseId) {
-                        "squat" -> "Squat"
-                        "dumbbell_lateral_raise" -> "Dumbbell Lateral Raise"
-                        "dumbbell_overhead_triceps_extension" -> "Dumbbell Overhead Triceps Extension"
-                        "right_leg_lunge_to_knee_raise" -> "Right Leg Lunge To Knee Raise"
-                        "standing_dumbbell_shoulder_press" -> "Standing Dumbbell Shoulder Press"
-                        else -> "Unknown"
-                    }
+                    val exerciseName = exerciseList
+                        .find { it.id == exerciseId }
+                        ?.title ?: "Unknown"
 
                     scope.launch(Dispatchers.IO) {
                         val newRecordId = dao.insertRecord(
@@ -187,10 +190,48 @@ fun TrainingScreen(
             SessionPhase.FINISHED  -> Unit
         }
 
+        ReferenceSkeletonSwitch(
+            checked = showReferenceSkeleton,
+            onCheckedChange = { showReferenceSkeleton = it },
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
+
         // ── Layer 5: pause banner (on top of everything) ──────────────────────
         if (uiState.isTrainingPaused) {
             PauseBanner(modifier = Modifier.align(Alignment.TopCenter))
         }
+    }
+}
+
+@Composable
+private fun ReferenceSkeletonSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .padding(16.dp)
+            .background(
+                Color.Black.copy(alpha = 0.55f),
+                RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Blue",
+            color = Color.White,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
     }
 }
 
