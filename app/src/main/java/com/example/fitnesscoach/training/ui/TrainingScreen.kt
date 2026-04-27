@@ -44,6 +44,13 @@ fun TrainingScreen(
     val context = LocalContext.current
     val viewModel: TrainingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val blueJointColors = remember {
+        List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) }
+    }
+
+    val blueLimbColors = remember {
+        List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) }
+    }
     var showReferenceSkeleton by remember { mutableStateOf(true) }
     val database = remember {
         Room.databaseBuilder(
@@ -115,8 +122,10 @@ fun TrainingScreen(
         ) {
             SkeletonOverlay(
                 landmarks = uiState.matchedReferenceRawLandmarks,
-                jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+//                jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+//                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
+                jointColors = blueJointColors,
+                limbColors = blueLimbColors,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -151,16 +160,6 @@ fun TrainingScreen(
                     val incorrectReps = uiState.incorrectReps
 
                     viewModel.stopTraining()
-
-//                    val exerciseName = when (exerciseId) {
-//                        "squat" -> "Squat"
-//                        "dumbbell_lateral_raise" -> "Dumbbell Lateral Raise"
-//                        "dumbbell_overhead_triceps_extension" -> "Dumbbell Overhead Triceps Extension"
-//                        "right_leg_lunge_to_knee_raise" -> "Right Leg Lunge To Knee Raise"
-//                        "standing_dumbbell_shoulder_press" -> "Standing Dumbbell Shoulder Press"
-//                        "bicep_curl" -> "Bicep Curl"
-//                        else -> "Unknown"
-//                    }
 
                     val exerciseName = exerciseList
                         .find { it.id == exerciseId }

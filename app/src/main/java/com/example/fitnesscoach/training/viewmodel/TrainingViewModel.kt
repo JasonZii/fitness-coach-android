@@ -34,6 +34,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -91,6 +94,8 @@ data class TrainingUiState(
      */
     val matchedReferenceRawLandmarks: List<Triple<Float, Float, Float>> = emptyList(),
 
+    val dynamicReferenceLandmarks: List<Triple<Float, Float, Float>> = emptyList(),
+
     // ── Rep tracking ──────────────────────────────────────────────────────────
     /** Number of fully completed reps this session. */
     val repCount: Int = 0,
@@ -108,6 +113,7 @@ data class TrainingUiState(
      * False during normal training.
      */
     val isTrainingPaused: Boolean = false,
+
 )
 
 // ── ViewModel ─────────────────────────────────────────────────────────────────
@@ -154,6 +160,36 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     // ── Required camera angle for the current exercise ─────────────────────────
     @Volatile private var requiredCameraAngle: CameraAngle = CameraAngle.SIDE
+
+    private var referenceFrameIndex = 0
+    private var referenceJob: Job? = null
+    private var referenceFrames: List<List<Triple<Float, Float, Float>>> = emptyList()
+
+    private fun startDynamicReferenceSkeleton() {
+        referenceJob?.cancel()
+
+        referenceJob = viewModelScope.launch {
+            while (true) {
+                if (referenceFrames.isNotEmpty()) {
+
+                    referenceFrameIndex =
+                        (referenceFrameIndex + 1) % referenceFrames.size
+
+                    _uiState.value = _uiState.value.copy(
+                        dynamicReferenceLandmarks =
+                            referenceFrames[referenceFrameIndex]
+                    )
+                }
+
+                delay(100L) // 10 FPS
+            }
+        }
+    }
+
+    private fun stopDynamicReferenceSkeleton() {
+        referenceJob?.cancel()
+        referenceJob = null
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -207,7 +243,18 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             withContext(Dispatchers.Main) {
                 rawReferenceSequence = rawSeq
                 referenceSequence    = normalizedSeq
-                _uiState.update { it.copy(isReferenceLoaded = true) }
+//                _uiState.update { it.copy(isReferenceLoaded = true) }
+
+                referenceFrames = rawSeq
+                referenceFrameIndex = 0
+                _uiState.update {
+                    it.copy(
+                        isReferenceLoaded = true,
+                        dynamicReferenceLandmarks = referenceFrames.firstOrNull() ?: emptyList()
+                    )
+                }
+
+                startDynamicReferenceSkeleton()
             }
         }
     }
@@ -218,6 +265,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
      * caller can navigate to the result screen before the state is wiped.
      */
     fun stopTraining() {
+        stopDynamicReferenceSkeleton()
+
         _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
         readinessMachine.reset()
         endDetector.reset()
@@ -243,6 +292,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Initialise the end-detector baseline on the first TRAINING frame.
         if (nextPhase == SessionPhase.TRAINING) {
             endDetector.onTrainingStart(poseResult.landmarks, requiredCameraAngle)
+            //开始标准蓝色估计
+//            startDynamicReferenceSkeleton()
         }
 
         _uiState.update { state ->
