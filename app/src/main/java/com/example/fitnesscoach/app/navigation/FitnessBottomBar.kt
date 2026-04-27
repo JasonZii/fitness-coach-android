@@ -21,19 +21,50 @@ fun FitnessBottomBar(navController: NavController) {
         bottomNavItems.forEach { item ->
             NavigationBarItem(
                 selected = currentRoute == item.route,
+//                onClick = {
+//                    if (item.route == Routes.HOME) {
+//                        // HOME is both the target and the popUpTo anchor.
+//                        // Using inclusive=true clears HOME itself first, so
+//                        // launchSingleTop can never short-circuit the navigate.
+//                        navController.navigate(Routes.HOME) {
+//                            popUpTo(Routes.HOME) { inclusive = true }
+//                        }
+//                    } else {
+//                        navController.navigate(item.route) {
+//                            popUpTo(Routes.HOME) { saveState = true }
+//                            launchSingleTop = true
+//                            restoreState = true
+//                        }
+//                    }
+//                },
+
                 onClick = {
-                    if (item.route == Routes.HOME) {
-                        // HOME is both the target and the popUpTo anchor.
-                        // Using inclusive=true clears HOME itself first, so
-                        // launchSingleTop can never short-circuit the navigate.
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(Routes.HOME) { inclusive = true }
+                    when (item.route) {
+                        Routes.HOME -> {
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(Routes.HOME) { inclusive = true }
+                            }
                         }
-                    } else {
-                        navController.navigate(item.route) {
-                            popUpTo(Routes.HOME) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+
+                        Routes.EXERCISE_LIBRARY -> {
+                            val popped = navController.popBackStack(
+                                route = Routes.EXERCISE_LIBRARY,
+                                inclusive = false
+                            )
+
+                            if (!popped) {
+                                navController.navigate(Routes.EXERCISE_LIBRARY) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        }
+
+                        else -> {
+                            navController.navigate(item.route) {
+                                popUpTo(Routes.HOME) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
                 },
