@@ -86,22 +86,15 @@ fun TrainingScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        // ── Layer 1: live camera feed ─────────────────────────────────────────
+        // ── Layer 1: composited camera frame (camera image + skeleton drawn on bitmap) ──
+        // The skeleton is burned into the same bitmap as the camera frame, so position
+        // is always frame-perfect — no PreviewView / overlay desync.
         if (hasCameraPermission) {
             CameraPreview(
-                modifier = Modifier.fillMaxSize(),
-                context = context,
+                modifier       = Modifier.fillMaxSize(),
+                context        = context,
+                frameProcessor = viewModel.poseFrameProcessor,
                 onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
-            )
-        }
-
-        // ── Layer 2: user skeleton overlay ───────────────────────────────────
-        if (uiState.landmarks.size == LANDMARK_COUNT) {
-            SkeletonOverlay(
-                landmarks   = uiState.landmarks,
-                jointColors = uiState.jointColors,
-                limbColors  = uiState.limbColors,
-                modifier    = Modifier.fillMaxSize()
             )
         }
 
