@@ -40,10 +40,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-
+import kotlinx.coroutines.launch
 
 private const val CAMERA_DIRECTION_WARNING_GRACE_MS = 1500L
 private const val DIRECTION_DEBUG_TAG = "DIRECTION_DEBUG"
+
+// Limit OE-DTW input length to avoid getting slower over time.
+private const val MAX_USER_SEQUENCE_FRAMES = 30
+
+// Do heavy scoring every 2 frames, but still update skeleton every frame.
+private const val HEAVY_PROCESS_INTERVAL = 3
+
+// Turn this on only when debugging camera direction.
+private const val ENABLE_DIRECTION_DEBUG_LOG = false
+
+
 
 // ── Session phase ─────────────────────────────────────────────────────────────
 
@@ -164,6 +175,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private var wasTrainingPaused = false
     private var cameraDirectionMismatchSinceMs: Long? = null
 
+    private var trainingFrameCounter = 0
+    private var heavyScoringJob: Job? = null
+
     // ── Reference sequences (set once from IO thread, read on main thread) ──────
     @Volatile private var referenceSequence:    List<List<Pair<Float, Float>>>          = emptyList()
     @Volatile private var rawReferenceSequence: List<List<Triple<Float, Float, Float>>> = emptyList()
@@ -250,6 +264,11 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         wasTrainingPaused = false
         cameraDirectionMismatchSinceMs = null
         requiredCameraAngle = info.requiredCameraAngle
+
+        trainingFrameCounter = 0
+        heavyScoringJob?.cancel()
+        heavyScoringJob = null
+
         requiresFullBody = info.requiresFullBody
         requiredSideViewDirection = info.requiredSideViewDirection
         readinessVisibilityMode = info.readinessVisibilityMode
@@ -277,7 +296,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     )
                 }
 
-                startDynamicReferenceSkeleton()
+//                startDynamicReferenceSkeleton()
             }
         }
     }
@@ -290,6 +309,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     fun stopTraining() {
         stopDynamicReferenceSkeleton()
 
+        heavyScoringJob?.cancel()
+        heavyScoringJob = null
+
         _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
         readinessMachine.reset()
         endDetector.reset()
@@ -298,6 +320,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         countRepsUseCase.reset()
         wasTrainingPaused = false
         cameraDirectionMismatchSinceMs = null
+        trainingFrameCounter = 0
     }
 
     // ── Readiness phase ───────────────────────────────────────────────────────
@@ -339,6 +362,16 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (!_uiState.value.isReferenceLoaded) return
 
         val angle = detectCameraAngle(poseResult.landmarks)
+
+        // Update live skeleton immediately before running heavy scoring logic.
+        // This makes the green skeleton follow the user faster.
+        _uiState.update { state ->
+            state.copy(
+                landmarks = poseResult.landmarks,
+                cameraAngle = angle
+            )
+        }
+
         val sideViewDirection = if (angle == CameraAngle.SIDE) {
             detectSideViewDirection(poseResult.landmarks)
         } else {
@@ -346,25 +379,27 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         }
         val nowMs = System.currentTimeMillis()
         val directionMismatch = requiredCameraAngle == CameraAngle.SIDE && (
-            angle == CameraAngle.FRONT ||
-                (
-                    angle == CameraAngle.SIDE &&
-                        requiredSideViewDirection != SideViewDirection.NONE &&
-                        sideViewDirection != SideViewDirection.UNKNOWN &&
-                        sideViewDirection != requiredSideViewDirection
-                    )
-            )
+                angle == CameraAngle.FRONT ||
+                        (
+                                angle == CameraAngle.SIDE &&
+                                        requiredSideViewDirection != SideViewDirection.NONE &&
+                                        sideViewDirection != SideViewDirection.UNKNOWN &&
+                                        sideViewDirection != requiredSideViewDirection
+                                )
+                )
         val showDirectionWarning = updateCameraDirectionWarning(directionMismatch, nowMs)
-        Log.d(
-            DIRECTION_DEBUG_TAG,
-            "exerciseId=$currentExerciseId, " +
-                "requiredCameraAngle=$requiredCameraAngle, " +
-                "cameraAngle=$angle, " +
-                "requiredSideViewDirection=$requiredSideViewDirection, " +
-                "detectedSideViewDirection=$sideViewDirection, " +
-                "warningMismatch=$directionMismatch, " +
-                "showDirectionWarning=$showDirectionWarning"
-        )
+        if (ENABLE_DIRECTION_DEBUG_LOG) {
+            Log.d(
+                DIRECTION_DEBUG_TAG,
+                "exerciseId=$currentExerciseId, " +
+                        "requiredCameraAngle=$requiredCameraAngle, " +
+                        "cameraAngle=$angle, " +
+                        "requiredSideViewDirection=$requiredSideViewDirection, " +
+                        "detectedSideViewDirection=$sideViewDirection, " +
+                        "warningMismatch=$directionMismatch, " +
+                        "showDirectionWarning=$showDirectionWarning"
+            )
+        }
 
         // Step 0 — Module 6: check for auto-pause conditions (too close / low visibility).
         val pauseState = endDetector.update(
@@ -386,8 +421,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             // While paused, keep updating the skeleton overlay but skip scoring.
             _uiState.update { state ->
                 state.copy(
-                    landmarks        = poseResult.landmarks,
-                    cameraAngle      = angle,
+                    landmarks = poseResult.landmarks,
+                    cameraAngle = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused = true,
                 )
@@ -408,27 +443,127 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
+        // Update skeleton every frame, but skip heavy scoring on some frames.
+//        trainingFrameCounter++
+//
+//        if (trainingFrameCounter % HEAVY_PROCESS_INTERVAL != 0) {
+//            _uiState.update { state ->
+//                state.copy(
+//                    landmarks = poseResult.landmarks,
+//                    cameraAngle = angle,
+//                    isCameraDirectionWarningVisible = showDirectionWarning,
+//                    isTrainingPaused = false,
+//                )
+//            }
+//            return
+//        }
+//
+//        val normalized = normalizeLandmarks(poseResult.landmarks)
+//        userSequence.add(normalized)
+//
+//        // Keep only recent frames.
+//        // Otherwise userSequence becomes longer and OE-DTW gets slower over time.
+//        if (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
+//            userSequence.removeAt(0)
+//        }
+//
+//        // Step 2 — find the matching reference frame (Module 2)
+//        // Returns -1 for the first OE_DTW_MIN_FRAMES frames (warm-up period).
+//        val matchedIdx = alignOeDtw(userSequence, referenceSequence)
+//
+//        // Step 3 — score the frame and derive joint/limb colors (Module 3)
+//        // EvaluateExerciseUseCase returns all-green with sf=100 when matchedIdx == -1.
+//        val scoreResult = evaluateUseCase.evaluate(
+//            matchedIdx, normalized, referenceSequence,
+//            upperBodyOnly = !requiresFullBody,
+//        )
+//
+//        // Step 4 — accumulate this frame's score for the current rep.
+//        // hasRedJoint is computed here so it can be forwarded to RepScoreTracker for
+//        // the correct/incorrect rep classification (continuous red-frame threshold).
+//        val hasRedLimb = scoreResult.limbColors.any { it == Color.Red }
+//        repScoreTracker.addFrameScore(scoreResult.sf, hasRedLimb)
+//
+//        // Step 5 — rep detection (Module 4)
+//        val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
+//
+//        val updatedRepScores = if (repCompleted) {
+//            repScoreTracker.finishRep()          // seals this rep's average score
+//            userSequence.clear()                 // reset OE-DTW input for the next rep
+//            repScoreTracker.getCompletedRepScores()
+//        } else {
+//            _uiState.value.repScores             // no change
+//        }
+//
+//        // Expose the matched standard frame's landmarks only when at least one limb is red.
+//        // Reposition the reference frame onto the live user's body centre and scale so the
+//        // ghost skeleton overlays the user regardless of recording distance or position.
+//        val matchedRaw = if (hasRedLimb && matchedIdx != -1)
+//            repositionReference(rawReferenceSequence[matchedIdx],
+//                poseResult.landmarks
+//            )
+//        else emptyList()
+//
+//        _uiState.update { state ->
+//            state.copy(
+//                landmarks                    = poseResult.landmarks,
+//                cameraAngle                  = angle,
+//                isCameraDirectionWarningVisible = showDirectionWarning,
+//                jointColors                  = scoreResult.jointColors,
+//                limbColors                   = scoreResult.limbColors,
+//                currentFrameScore            = scoreResult.sf,
+//                matchedReferenceRawLandmarks = matchedRaw,
+//                repCount                     = updatedRepScores.size,
+//                repScores                    = updatedRepScores,
+//                correctReps                  = repScoreTracker.correctReps,
+//                incorrectReps                = repScoreTracker.incorrectReps,
+//                isTrainingPaused             = false,
+//            )
+//        }
+//    }
+
+        // Update skeleton every frame, but skip heavy scoring on some frames.
+        trainingFrameCounter++
+
+        if (trainingFrameCounter % HEAVY_PROCESS_INTERVAL != 0) {
+            _uiState.update { state ->
+                state.copy(
+                    landmarks = poseResult.landmarks,
+                    cameraAngle = angle,
+                    isCameraDirectionWarningVisible = showDirectionWarning,
+                    isTrainingPaused = false,
+                )
+            }
+            return
+        }
+
         val normalized = normalizeLandmarks(poseResult.landmarks)
         userSequence.add(normalized)
 
-        // Step 2 — find the matching reference frame (Module 2)
-        // Returns -1 for the first OE_DTW_MIN_FRAMES frames (warm-up period).
+// Keep only recent frames.
+// Otherwise userSequence becomes longer and OE-DTW gets slower over time.
+        if (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
+            userSequence.removeAt(0)
+        }
+
+// Step 2 — find the matching reference frame (Module 2)
+// Returns -1 for the first OE_DTW_MIN_FRAMES frames (warm-up period).
         val matchedIdx = alignOeDtw(userSequence, referenceSequence)
 
-        // Step 3 — score the frame and derive joint/limb colors (Module 3)
-        // EvaluateExerciseUseCase returns all-green with sf=100 when matchedIdx == -1.
+// Step 3 — score the frame and derive joint/limb colors (Module 3)
+// EvaluateExerciseUseCase returns all-green with sf=100 when matchedIdx == -1.
         val scoreResult = evaluateUseCase.evaluate(
             matchedIdx, normalized, referenceSequence,
             upperBodyOnly = !requiresFullBody,
         )
 
-        // Step 4 — accumulate this frame's score for the current rep.
-        // hasRedJoint is computed here so it can be forwarded to RepScoreTracker for
-        // the correct/incorrect rep classification (continuous red-frame threshold).
+// Step 4 — accumulate this frame's score for the current rep.
+// hasRedJoint is computed here so it can be forwarded to RepScoreTracker for
+// the correct/incorrect rep classification (continuous red-frame threshold).
         val hasRedLimb = scoreResult.limbColors.any { it == Color.Red }
         repScoreTracker.addFrameScore(scoreResult.sf, hasRedLimb)
 
-        // Step 5 — rep detection (Module 4)
+// Step 5 — rep detection (Module 4)
         val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
 
         val updatedRepScores = if (repCompleted) {
@@ -439,27 +574,30 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             _uiState.value.repScores             // no change
         }
 
-        // Expose the matched standard frame's landmarks only when at least one limb is red.
-        // Reposition the reference frame onto the live user's body centre and scale so the
-        // ghost skeleton overlays the user regardless of recording distance or position.
+// Expose the matched standard frame's landmarks only when at least one limb is red.
+// Reposition the reference frame onto the live user's body centre and scale so the
+// ghost skeleton overlays the user regardless of recording distance or position.
         val matchedRaw = if (hasRedLimb && matchedIdx != -1)
-            repositionReference(rawReferenceSequence[matchedIdx], poseResult.landmarks)
+            repositionReference(
+                rawReferenceSequence[matchedIdx],
+                poseResult.landmarks
+            )
         else emptyList()
 
         _uiState.update { state ->
             state.copy(
-                landmarks                    = poseResult.landmarks,
-                cameraAngle                  = angle,
+                landmarks = poseResult.landmarks,
+                cameraAngle = angle,
                 isCameraDirectionWarningVisible = showDirectionWarning,
-                jointColors                  = scoreResult.jointColors,
-                limbColors                   = scoreResult.limbColors,
-                currentFrameScore            = scoreResult.sf,
+                jointColors = scoreResult.jointColors,
+                limbColors = scoreResult.limbColors,
+                currentFrameScore = scoreResult.sf,
                 matchedReferenceRawLandmarks = matchedRaw,
-                repCount                     = updatedRepScores.size,
-                repScores                    = updatedRepScores,
-                correctReps                  = repScoreTracker.correctReps,
-                incorrectReps                = repScoreTracker.incorrectReps,
-                isTrainingPaused             = false,
+                repCount = updatedRepScores.size,
+                repScores = updatedRepScores,
+                correctReps = repScoreTracker.correctReps,
+                incorrectReps = repScoreTracker.incorrectReps,
+                isTrainingPaused = false,
             )
         }
     }

@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import android.util.Size
 
 class CameraController(private val context: Context) {
 
@@ -30,7 +31,21 @@ class CameraController(private val context: Context) {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
+//            val imageAnalysis = ImageAnalysis.Builder()
+//                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+//                .build()
+//                .also { analysis ->
+//                    analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+//                        onFrameAvailable(imageProxy)
+//                    }
+//                }
+
             val imageAnalysis = ImageAnalysis.Builder()
+                // Reduce analysis resolution to improve MediaPipe speed.
+                // Portrait camera usually works better with 480x640.
+//                .setTargetResolution(Size(480, 640))
+                .setTargetResolution(Size(360, 480))
+//                .setTargetResolution(Size(720, 960))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->

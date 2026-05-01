@@ -25,6 +25,7 @@ class PoseLandmarkerHelper(
 
         val baseOptions = BaseOptions.builder()
             .setModelAssetPath("pose_landmarker_full.task")
+//            .setModelAssetPath("pose_landmarker_lite.task")
             .setDelegate(Delegate.CPU)
             .build()
 
@@ -32,6 +33,9 @@ class PoseLandmarkerHelper(
             .setBaseOptions(baseOptions)
             .setRunningMode(RunningMode.LIVE_STREAM)
             .setNumPoses(1)
+            .setMinPoseDetectionConfidence(0.5f)
+            .setMinPosePresenceConfidence(0.5f)
+            .setMinTrackingConfidence(0.6f)
             .setResultListener { result: PoseLandmarkerResult, _: com.google.mediapipe.framework.image.MPImage ->
                 deliverResult(mapResult(result))
             }

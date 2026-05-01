@@ -33,7 +33,8 @@ fun CameraPreview(
         modifier = modifier,
         factory = { ctx ->
             PreviewView(ctx).apply {
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+//                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                implementationMode = PreviewView.ImplementationMode.PERFORMANCE
                 scaleType = PreviewView.ScaleType.FILL_CENTER
 
                 cameraController.startCamera(

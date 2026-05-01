@@ -47,11 +47,40 @@ internal val LIMB_CONNECTIONS: List<Pair<Int, Int>> = listOf(
  *
  * z is ignored per ALGORITHM.md §MediaPipe Output Format.
  */
+
+private const val CAMERA_IMAGE_WIDTH = 360f
+private const val CAMERA_IMAGE_HEIGHT = 480f
+
+
 internal fun projectLandmark(
     landmark: Triple<Float, Float, Float>,
     canvasWidth: Float,
     canvasHeight: Float
-): Pair<Float, Float> = Pair(landmark.first * canvasWidth, landmark.second * canvasHeight)
+)
+//: Pair<Float, Float> = Pair(
+//    landmark.first * canvasWidth,
+//    landmark.second * canvasHeight
+//)
+: Pair<Float, Float> {
+    val sourceWidth = CAMERA_IMAGE_WIDTH
+    val sourceHeight = CAMERA_IMAGE_HEIGHT
+
+    val scale = maxOf(
+        canvasWidth / sourceWidth,
+        canvasHeight / sourceHeight
+    )
+
+    val displayedWidth = sourceWidth * scale
+    val displayedHeight = sourceHeight * scale
+
+    val offsetX = (canvasWidth - displayedWidth) / 2f
+    val offsetY = (canvasHeight - displayedHeight) / 2f
+
+    val px = landmark.first * sourceWidth * scale + offsetX
+    val py = landmark.second * sourceHeight * scale + offsetY
+
+    return Pair(px, py)
+}
 
 /**
  * Compute the two endpoints of the spine limb in canvas pixel coordinates.
@@ -63,14 +92,34 @@ internal fun computeSpineEndpoints(
     landmarks: List<Triple<Float, Float, Float>>,
     canvasWidth: Float,
     canvasHeight: Float
-): Pair<Pair<Float, Float>, Pair<Float, Float>> {
-    val shoulderMidX = (landmarks[11].first + landmarks[12].first) / 2f
-    val shoulderMidY = (landmarks[11].second + landmarks[12].second) / 2f
-    val hipMidX = (landmarks[23].first + landmarks[24].first) / 2f
-    val hipMidY = (landmarks[23].second + landmarks[24].second) / 2f
+)
+//: Pair<Pair<Float, Float>, Pair<Float, Float>> {
+//    val shoulderMidX = (landmarks[11].first + landmarks[12].first) / 2f
+//    val shoulderMidY = (landmarks[11].second + landmarks[12].second) / 2f
+//    val hipMidX = (landmarks[23].first + landmarks[24].first) / 2f
+//    val hipMidY = (landmarks[23].second + landmarks[24].second) / 2f
+//    return Pair(
+//        Pair(shoulderMidX * canvasWidth, shoulderMidY * canvasHeight),
+//        Pair(hipMidX * canvasWidth, hipMidY * canvasHeight)
+//    )
+//}
+
+: Pair<Pair<Float, Float>, Pair<Float, Float>> {
+    val shoulderMid = Triple(
+        (landmarks[11].first + landmarks[12].first) / 2f,
+        (landmarks[11].second + landmarks[12].second) / 2f,
+        0f
+    )
+
+    val hipMid = Triple(
+        (landmarks[23].first + landmarks[24].first) / 2f,
+        (landmarks[23].second + landmarks[24].second) / 2f,
+        0f
+    )
+
     return Pair(
-        Pair(shoulderMidX * canvasWidth, shoulderMidY * canvasHeight),
-        Pair(hipMidX * canvasWidth, hipMidY * canvasHeight)
+        projectLandmark(shoulderMid, canvasWidth, canvasHeight),
+        projectLandmark(hipMid, canvasWidth, canvasHeight)
     )
 }
 
