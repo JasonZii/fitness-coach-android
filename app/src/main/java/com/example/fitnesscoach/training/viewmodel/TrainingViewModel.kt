@@ -183,7 +183,26 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
      * to [algorithmDispatcher] so the main thread is never blocked.
      */
     fun onFrame(poseResult: PoseResult) {
-        if (poseResult.landmarks.size != LANDMARK_COUNT) return
+        if (poseResult.landmarks.size != LANDMARK_COUNT) {
+            viewModelScope.launch(algorithmDispatcher) {
+                if (_uiState.value.phase == SessionPhase.READINESS) {
+                    val readiness = readinessMachine.update(
+                        conditionsMet = false,
+                        nowMs = System.currentTimeMillis(),
+                    )
+                    _skeletonFlow.value = emptyList()
+                    _uiState.update { state ->
+                        state.copy(
+                            isFullBodyInFrame = false,
+                            cameraAngle = CameraAngle.AMBIGUOUS,
+                            readiness = readiness,
+                            phase = SessionPhase.READINESS,
+                        )
+                    }
+                }
+            }
+            return
+        }
 
         // Fast path — atomic write, visible to Compose immediately.
         _skeletonFlow.value = poseResult.landmarks
@@ -311,6 +330,20 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (!_uiState.value.isReferenceLoaded) return
 
         val angle = detectCameraAngle(poseResult.landmarks)
+        val fullBody = isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
+        val userIsValid = fullBody && angle == requiredCameraAngle
+
+        if (!userIsValid) {
+            _uiState.update { state ->
+                state.copy(
+                    isFullBodyInFrame = fullBody,
+                    cameraAngle       = angle,
+                    isTrainingPaused  = true,
+                )
+            }
+            return
+        }
+
         val sideViewDirection = if (angle == CameraAngle.SIDE)
             detectSideViewDirection(poseResult.landmarks)
         else SideViewDirection.UNKNOWN
@@ -348,6 +381,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (isPaused) {
             _uiState.update { state ->
                 state.copy(
+                    isFullBodyInFrame              = fullBody,
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = true,
@@ -359,6 +393,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (directionMismatch) {
             _uiState.update { state ->
                 state.copy(
+                    isFullBodyInFrame              = fullBody,
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = false,
@@ -421,6 +456,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         _uiState.update { state ->
             state.copy(
+                isFullBodyInFrame              = fullBody,
                 cameraAngle                     = angle,
                 isCameraDirectionWarningVisible = showDirectionWarning,
                 jointColors                     = scoreResult.jointColors,
