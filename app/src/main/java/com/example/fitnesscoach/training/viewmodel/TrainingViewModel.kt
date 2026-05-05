@@ -205,6 +205,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                             cameraAngle = CameraAngle.AMBIGUOUS,
                             readiness = readiness,
                             phase = SessionPhase.READINESS,
+                            matchedReferenceRawLandmarks = emptyList(),
                             cameraFrameWidth = poseResult.imageWidth,
                             cameraFrameHeight = poseResult.imageHeight,
                         )
@@ -353,6 +354,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     isFullBodyInFrame = fullBody,
                     cameraAngle       = angle,
                     isTrainingPaused  = true,
+                    matchedReferenceRawLandmarks = emptyList(),
                     cameraFrameWidth  = poseResult.imageWidth,
                     cameraFrameHeight = poseResult.imageHeight,
                 )
@@ -402,6 +404,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = true,
+                    matchedReferenceRawLandmarks    = emptyList(),
                     cameraFrameWidth                = poseResult.imageWidth,
                     cameraFrameHeight               = poseResult.imageHeight,
                 )
@@ -416,6 +419,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = false,
+                    matchedReferenceRawLandmarks    = emptyList(),
                     cameraFrameWidth                = poseResult.imageWidth,
                     cameraFrameHeight               = poseResult.imageHeight,
                 )

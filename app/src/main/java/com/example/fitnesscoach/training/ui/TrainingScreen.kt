@@ -111,6 +111,8 @@ fun TrainingScreen(
 
         if (
             showReferenceSkeleton &&
+            uiState.phase == SessionPhase.TRAINING &&
+            !uiState.isTrainingPaused &&
             uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT
         ) {
             SkeletonOverlay(
