@@ -143,6 +143,7 @@ class ReadinessStateMachineTest {
         machine.update(conditionsMet = true, nowMs = 1_500L)  // was at tick 2
         val state = machine.update(conditionsMet = false, nowMs = 2_000L)
         assertEquals(ReadinessPhase.NOT_READY, state.phase)
+        assertEquals(0, state.countdownTick)
     }
 
     @Test
@@ -151,6 +152,16 @@ class ReadinessStateMachineTest {
         machine.update(conditionsMet = true, nowMs = 1_500L)  // tick was 2
         machine.update(conditionsMet = false, nowMs = 2_000L) // reset
         val state = machine.update(conditionsMet = true, nowMs = 3_000L) // fresh start
+        assertEquals(ReadinessPhase.COUNTDOWN, state.phase)
+        assertEquals(3, state.countdownTick)
+    }
+
+    @Test
+    fun update_conditionsRemeetLongAfterBreak_doesNotJumpToTrainingStarted() {
+        machine.update(conditionsMet = true, nowMs = 0L)
+        machine.update(conditionsMet = true, nowMs = 1_500L)  // tick was 2
+        machine.update(conditionsMet = false, nowMs = 2_000L) // reset
+        val state = machine.update(conditionsMet = true, nowMs = 30_000L)
         assertEquals(ReadinessPhase.COUNTDOWN, state.phase)
         assertEquals(3, state.countdownTick)
     }

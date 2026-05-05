@@ -86,22 +86,15 @@ fun TrainingScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        // ── Layer 1: live camera feed ─────────────────────────────────────────
+        // ── Layer 1: composited camera frame (camera image + skeleton drawn on bitmap) ──
+        // The skeleton is burned into the same bitmap as the camera frame, so position
+        // is always frame-perfect — no PreviewView / overlay desync.
         if (hasCameraPermission) {
             CameraPreview(
-                modifier = Modifier.fillMaxSize(),
-                context = context,
+                modifier       = Modifier.fillMaxSize(),
+                context        = context,
+                frameProcessor = viewModel.poseFrameProcessor,
                 onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
-            )
-        }
-
-        // ── Layer 2: user skeleton overlay ───────────────────────────────────
-        if (uiState.landmarks.size == LANDMARK_COUNT) {
-            SkeletonOverlay(
-                landmarks   = uiState.landmarks,
-                jointColors = uiState.jointColors,
-                limbColors  = uiState.limbColors,
-                modifier    = Modifier.fillMaxSize()
             )
         }
 
@@ -118,6 +111,8 @@ fun TrainingScreen(
 
         if (
             showReferenceSkeleton &&
+            uiState.phase == SessionPhase.TRAINING &&
+            !uiState.isTrainingPaused &&
             uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT
         ) {
             SkeletonOverlay(
@@ -126,6 +121,8 @@ fun TrainingScreen(
 //                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
                 jointColors = blueJointColors,
                 limbColors = blueLimbColors,
+                sourceWidth = uiState.cameraFrameWidth,
+                sourceHeight = uiState.cameraFrameHeight,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -197,7 +194,17 @@ fun TrainingScreen(
 
         // ── Layer 5: pause banner (on top of everything) ──────────────────────
         if (uiState.isTrainingPaused) {
-            PauseBanner(modifier = Modifier.align(Alignment.TopCenter))
+            val pauseMessage = when {
+                !uiState.isFullBodyInFrame ->
+                    "Training paused: please keep your full body in the frame."
+                uiState.cameraAngle != uiState.requiredCameraAngle ->
+                    "Training paused: please adjust your camera angle."
+                else -> "Paused — move back or ensure full body is visible"
+            }
+            PauseBanner(
+                text = pauseMessage,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 }
@@ -258,9 +265,9 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
 
                     // ── Camera-angle status ───────────────────────────────────
                     val angleInstruction = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
-                        "Turn side-on and match the reference video direction"
+                        "Please adjust your camera angle."
                     else
-                        "Face the camera"
+                        "Please adjust your camera angle."
                     val angleReadyText = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
                         "Side-on direction matches the reference video"
                     else
@@ -279,7 +286,7 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
                         ReadinessCheckRow(
                             satisfied       = uiState.isFullBodyInFrame,
                             satisfiedText   = "Body landmarks visible",
-                            unsatisfiedText = "Ensure your body landmarks stay visible",
+                            unsatisfiedText = "Please keep your full body in the frame.",
                             unsatisfiedColor = Color(0xFFFF6B6B),   // red – more urgent
                         )
                     }
@@ -377,7 +384,10 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
 // ── Pause banner ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun PauseBanner(modifier: Modifier = Modifier) {
+private fun PauseBanner(
+    text: String = "Paused — move back or ensure full body is visible",
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -386,7 +396,7 @@ private fun PauseBanner(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = "Paused — move back or ensure full body is visible",
+            text = text,
             color = Color.White,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium

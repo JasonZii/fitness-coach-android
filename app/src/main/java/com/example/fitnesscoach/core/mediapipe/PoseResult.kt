@@ -9,5 +9,7 @@ package com.example.fitnesscoach.core.mediapipe
  */
 data class PoseResult(
     val landmarks: List<Triple<Float, Float, Float>>,
-    val visibilities: List<Float>
+    val visibilities: List<Float>,
+    val imageWidth: Int = 0,
+    val imageHeight: Int = 0,
 )

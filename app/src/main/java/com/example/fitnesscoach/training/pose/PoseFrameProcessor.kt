@@ -3,8 +3,10 @@ package com.example.fitnesscoach.training.pose
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.YuvImage
 import android.util.Log
@@ -13,35 +15,81 @@ import com.example.fitnesscoach.core.mediapipe.PoseLandmarkerHelper
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 import java.io.ByteArrayOutputStream
 
+// Joints to draw (upper-body + lower-body key joints).
+private val DRAWN_JOINT_INDICES = setOf(11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)
+
+// (start, end) index pairs; (-1, -1) means spine via shoulder/hip midpoints.
+private val LIMB_PAIRS = listOf(
+    11 to 13, 13 to 15,   // left arm
+    12 to 14, 14 to 16,   // right arm
+    11 to 23, 12 to 24,   // torso sides
+    23 to 25, 24 to 26,   // thighs
+    25 to 27, 26 to 28,   // shins
+    11 to 12,             // shoulder line
+    23 to 24,             // hip line
+    -1 to -1              // spine (midpoints)
+)
+
+private const val VISIBILITY_THRESHOLD = 0.5f
+private const val JOINT_RADIUS_PX = 6f
+private const val LIMB_STROKE_PX  = 3.5f
+
 class PoseFrameProcessor(context: Context) {
 
     private val appContext = context.applicationContext
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
-    private var onResultListener: ((PoseResult) -> Unit)? = null
 
+    // Latest scoring colours from the algorithm dispatcher (previous frame).
+    // Written by TrainingViewModel; read here when drawing on the bitmap.
+    // Replacing the array reference atomically with @Volatile is sufficient
+    // because we never mutate in-place.
+    @Volatile private var latestJointArgbColors: IntArray =
+        IntArray(33) { android.graphics.Color.GREEN }
+    @Volatile private var latestLimbArgbColors: IntArray =
+        IntArray(13) { android.graphics.Color.GREEN }
+
+    /**
+     * Called by TrainingViewModel (on algorithmDispatcher) after each scoring frame.
+     * Updates the colours used the NEXT time drawSkeletonOnBitmap() runs.
+     */
+    fun updateColors(jointArgbColors: IntArray, limbArgbColors: IntArray) {
+        latestJointArgbColors = jointArgbColors
+        latestLimbArgbColors  = limbArgbColors
+    }
+
+    /**
+     * Synchronous: converts [imageProxy] → Bitmap, runs MediaPipe inference,
+     * draws the skeleton onto the Bitmap, then delivers both via [onResult].
+     *
+     * Joints with visibility < [VISIBILITY_THRESHOLD] are skipped so that
+     * occluded side-view joints don't jitter across the screen.
+     *
+     * The Bitmap is recycled automatically after [onResult] returns — do not
+     * store a reference to it beyond the callback.
+     */
     fun processFrame(
         imageProxy: ImageProxy,
-        timestampMs: Long,
-        onResult: (PoseResult) -> Unit
+        onResult: (Bitmap, PoseResult) -> Unit
     ) {
         try {
-            onResultListener = onResult
-
             if (poseLandmarkerHelper == null) {
-                poseLandmarkerHelper = PoseLandmarkerHelper(appContext) { result ->
-                    onResultListener?.invoke(result)
-                }
+                poseLandmarkerHelper = PoseLandmarkerHelper(appContext)
+            }
+            val bitmap      = imageProxyToBitmap(imageProxy)
+            val timestampMs = System.currentTimeMillis()
+            val poseResult  = poseLandmarkerHelper!!.detectSync(bitmap, timestampMs)
+
+            if (poseResult.landmarks.size == 33) {
+                drawSkeletonOnBitmap(bitmap, poseResult)
             }
 
-            val bitmap = imageProxyToBitmap(imageProxy)
-            poseLandmarkerHelper?.detectAsync(bitmap, timestampMs)
+            onResult(bitmap, poseResult)
+            bitmap.recycle()
         } catch (e: Exception) {
             Log.e("POSE", "Processing failed", e)
             onResult(
-                PoseResult(
-                    landmarks = emptyList(),
-                    visibilities = emptyList()
-                )
+                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
+                PoseResult(emptyList(), emptyList(), imageWidth = 1, imageHeight = 1)
             )
         } finally {
             imageProxy.close()
@@ -57,6 +105,63 @@ class PoseFrameProcessor(context: Context) {
         }
     }
 
+    // ── Skeleton drawing ───────────────────────────────────────────────────────
+
+    private fun drawSkeletonOnBitmap(bitmap: Bitmap, poseResult: PoseResult) {
+        val canvas       = Canvas(bitmap)
+        val landmarks    = poseResult.landmarks
+        val visibilities = poseResult.visibilities
+        val jointColors  = latestJointArgbColors
+        val limbColors   = latestLimbArgbColors
+        val w = bitmap.width.toFloat()
+        val h = bitmap.height.toFloat()
+
+        val limbPaint = Paint().apply {
+            isAntiAlias  = true
+            style        = Paint.Style.STROKE
+            strokeWidth  = LIMB_STROKE_PX
+            strokeCap    = Paint.Cap.ROUND
+        }
+        val jointPaint = Paint().apply {
+            isAntiAlias = true
+            style       = Paint.Style.FILL
+        }
+
+        fun vis(idx: Int) = visibilities.getOrElse(idx) { 0f }
+        fun px(idx: Int)  = landmarks[idx].first  * w
+        fun py(idx: Int)  = landmarks[idx].second * h
+
+        // Draw limbs first so joints render on top.
+        LIMB_PAIRS.forEachIndexed { i, (s, e) ->
+            limbPaint.color = limbColors.getOrElse(i) { android.graphics.Color.GREEN }
+            if (s == -1) {
+                // Spine: midpoint(11,12) → midpoint(23,24)
+                if (vis(11) >= VISIBILITY_THRESHOLD && vis(12) >= VISIBILITY_THRESHOLD &&
+                    vis(23) >= VISIBILITY_THRESHOLD && vis(24) >= VISIBILITY_THRESHOLD) {
+                    canvas.drawLine(
+                        (px(11) + px(12)) / 2f, (py(11) + py(12)) / 2f,
+                        (px(23) + px(24)) / 2f, (py(23) + py(24)) / 2f,
+                        limbPaint
+                    )
+                }
+            } else {
+                if (vis(s) >= VISIBILITY_THRESHOLD && vis(e) >= VISIBILITY_THRESHOLD) {
+                    canvas.drawLine(px(s), py(s), px(e), py(e), limbPaint)
+                }
+            }
+        }
+
+        // Draw joints.
+        DRAWN_JOINT_INDICES.forEach { idx ->
+            if (vis(idx) >= VISIBILITY_THRESHOLD) {
+                jointPaint.color = jointColors.getOrElse(idx) { android.graphics.Color.GREEN }
+                canvas.drawCircle(px(idx), py(idx), JOINT_RADIUS_PX, jointPaint)
+            }
+        }
+    }
+
+    // ── YUV → Bitmap conversion ────────────────────────────────────────────────
+
     private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
         val yBuffer = imageProxy.planes[0].buffer
         val uBuffer = imageProxy.planes[1].buffer
@@ -67,45 +172,20 @@ class PoseFrameProcessor(context: Context) {
         val vSize = vBuffer.remaining()
 
         val nv21 = ByteArray(ySize + uSize + vSize)
-
         yBuffer.get(nv21, 0, ySize)
         vBuffer.get(nv21, ySize, vSize)
         uBuffer.get(nv21, ySize + vSize, uSize)
 
-        val yuvImage = YuvImage(
-            nv21,
-            ImageFormat.NV21,
-            imageProxy.width,
-            imageProxy.height,
-            null
-        )
-
+        val yuvImage = YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
         val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(
-            Rect(0, 0, imageProxy.width, imageProxy.height),
-            60,
-            out
-        )
-
-        val imageBytes = out.toByteArray()
-        var bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        yuvImage.compressToJpeg(Rect(0, 0, imageProxy.width, imageProxy.height), 80, out)
+        val bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
 
         val matrix = Matrix()
         matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-        // Front camera sensor output is unmirrored; flip horizontally so landmark
-        // coordinates match the mirrored PreviewView shown to the user.
+        // Front camera: flip horizontally so coordinates match the display.
         matrix.postScale(-1f, 1f)
-
-        bitmap = Bitmap.createBitmap(
-            bitmap,
-            0,
-            0,
-            bitmap.width,
-            bitmap.height,
-            matrix,
-            true
-        )
-
-        return bitmap
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+            .also { bitmap.recycle() }
     }
 }

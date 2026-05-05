@@ -2,8 +2,6 @@ package com.example.fitnesscoach.core.mediapipe
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -12,97 +10,76 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarker
 import com.google.mediapipe.tasks.vision.poselandmarker.PoseLandmarkerResult
 
-class PoseLandmarkerHelper(
-    context: Context,
-    private val onResult: (PoseResult) -> Unit
-) {
+class PoseLandmarkerHelper(context: Context) {
 
     private val poseLandmarker: PoseLandmarker
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
-        val appContext = context.applicationContext
-
-        val baseOptions = BaseOptions.builder()
-            .setModelAssetPath("pose_landmarker_full.task")
-            .setDelegate(Delegate.CPU)
-            .build()
-
-        val options = PoseLandmarker.PoseLandmarkerOptions.builder()
-            .setBaseOptions(baseOptions)
-            .setRunningMode(RunningMode.LIVE_STREAM)
-            .setNumPoses(1)
-            .setResultListener { result: PoseLandmarkerResult, _: com.google.mediapipe.framework.image.MPImage ->
-                deliverResult(mapResult(result))
-            }
-            .setErrorListener { error ->
-                Log.e("POSE", "Pose detection failed", error)
-                deliverResult(
-                    PoseResult(
-                        landmarks = emptyList(),
-                        visibilities = emptyList()
-                    )
-                )
-            }
-            .build()
-
-        poseLandmarker = PoseLandmarker.createFromOptions(appContext, options)
-        Log.d("POSE", "PoseLandmarker initialized")
+        // Try GPU first for lower latency; fall back to CPU if the device
+        // does not support the required OpenGL ES version or driver features.
+        poseLandmarker =
+            tryCreateWithDelegate(context.applicationContext, Delegate.GPU)
+                ?: tryCreateWithDelegate(context.applicationContext, Delegate.CPU)
+                ?: error("PoseLandmarker: both GPU and CPU init failed")
     }
 
-    fun detectAsync(bitmap: Bitmap, timestampMs: Long) {
+    private fun tryCreateWithDelegate(context: Context, delegate: Delegate): PoseLandmarker? =
+        try {
+            val baseOptions = BaseOptions.builder()
+                .setModelAssetPath("pose_landmarker_full.task")
+                .setDelegate(delegate)
+                .build()
+            val options = PoseLandmarker.PoseLandmarkerOptions.builder()
+                .setBaseOptions(baseOptions)
+                .setRunningMode(RunningMode.VIDEO)
+                .setNumPoses(1)
+                .setMinPoseDetectionConfidence(0.5f)
+                .setMinPosePresenceConfidence(0.5f)
+                .setMinTrackingConfidence(0.6f)
+                .build()
+            PoseLandmarker.createFromOptions(context, options).also {
+                Log.d("POSE", "PoseLandmarker initialised with $delegate")
+            }
+        } catch (e: Exception) {
+            Log.w("POSE", "Cannot init PoseLandmarker with $delegate: ${e.message}")
+            null
+        }
+
+    /**
+     * Synchronously detects pose landmarks from [bitmap].
+     * Blocks the caller's thread (analysisExecutor) until inference completes.
+     * VIDEO mode guarantees no async callback, no frame-queue build-up.
+     */
+    fun detectSync(bitmap: Bitmap, timestampMs: Long): PoseResult =
         try {
             val mpImage = BitmapImageBuilder(bitmap).build()
-            poseLandmarker.detectAsync(mpImage, timestampMs)
-        } catch (e: Exception) {
-            Log.e("POSE", "Pose detection submission failed", e)
-            deliverResult(
-                PoseResult(
-                    landmarks = emptyList(),
-                    visibilities = emptyList()
-                )
+            mapResult(
+                result = poseLandmarker.detectForVideo(mpImage, timestampMs),
+                imageWidth = bitmap.width,
+                imageHeight = bitmap.height,
             )
+        } catch (e: Exception) {
+            Log.e("POSE", "Pose detection failed", e)
+            PoseResult(emptyList(), emptyList(), bitmap.width, bitmap.height)
         }
-    }
 
     fun close() {
         poseLandmarker.close()
     }
 
-    private fun mapResult(result: PoseLandmarkerResult): PoseResult {
+    private fun mapResult(
+        result: PoseLandmarkerResult,
+        imageWidth: Int,
+        imageHeight: Int,
+    ): PoseResult {
         val landmarks = result.landmarks()
-        if (landmarks.isEmpty()) {
-            Log.d("POSE", "Landmarks count: 0")
-            return PoseResult(
-                landmarks = emptyList(),
-                visibilities = emptyList()
-            )
-        }
-
+        if (landmarks.isEmpty()) return PoseResult(emptyList(), emptyList(), imageWidth, imageHeight)
         val firstPose = landmarks[0]
-        Log.d("POSE", "Landmarks count: ${firstPose.size}")
-
         return PoseResult(
-            landmarks = firstPose.map { landmark ->
-                Triple(
-                    landmark.x(),
-                    landmark.y(),
-                    landmark.z()
-                )
-            },
-            visibilities = firstPose.map { landmark ->
-                landmark.visibility().orElse(0f)
-            }
+            landmarks    = firstPose.map { Triple(it.x(), it.y(), it.z()) },
+            visibilities = firstPose.map { it.visibility().orElse(0f) },
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
         )
-    }
-
-    private fun deliverResult(result: PoseResult) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            onResult(result)
-        } else {
-            mainHandler.post {
-                onResult(result)
-            }
-        }
     }
 }

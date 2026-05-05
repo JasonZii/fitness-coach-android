@@ -1,12 +1,11 @@
 package com.example.fitnesscoach.core.camera
 
 import android.content.Context
+import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.ExecutorService
@@ -16,21 +15,22 @@ class CameraController(private val context: Context) {
 
     private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
+    /**
+     * Starts the camera in analysis-only mode (no Preview use case).
+     * Each captured frame is delivered to [onFrameAvailable] on a background thread.
+     * The caller is responsible for displaying the processed result (e.g., drawing
+     * skeleton on the bitmap and rendering to a SurfaceView).
+     */
     fun startCamera(
-        previewView: PreviewView,
         lifecycleOwner: LifecycleOwner,
         onFrameAvailable: (ImageProxy) -> Unit
     ) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-
         cameraProviderFuture.addListener({
             val cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-
             val imageAnalysis = ImageAnalysis.Builder()
+                .setTargetResolution(Size(360, 480))
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { analysis ->
@@ -39,14 +39,11 @@ class CameraController(private val context: Context) {
                     }
                 }
 
-            val cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA
-
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     lifecycleOwner,
-                    cameraSelector,
-                    preview,
+                    CameraSelector.DEFAULT_FRONT_CAMERA,
                     imageAnalysis
                 )
             } catch (e: Exception) {

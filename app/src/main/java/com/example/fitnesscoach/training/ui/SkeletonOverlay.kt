@@ -47,11 +47,38 @@ internal val LIMB_CONNECTIONS: List<Pair<Int, Int>> = listOf(
  *
  * z is ignored per ALGORITHM.md §MediaPipe Output Format.
  */
+
 internal fun projectLandmark(
     landmark: Triple<Float, Float, Float>,
     canvasWidth: Float,
-    canvasHeight: Float
-): Pair<Float, Float> = Pair(landmark.first * canvasWidth, landmark.second * canvasHeight)
+    canvasHeight: Float,
+    sourceWidth: Float = canvasWidth,
+    sourceHeight: Float = canvasHeight,
+)
+//: Pair<Float, Float> = Pair(
+//    landmark.first * canvasWidth,
+//    landmark.second * canvasHeight
+//)
+: Pair<Float, Float> {
+    val frameWidth = sourceWidth.takeIf { it > 0f } ?: canvasWidth
+    val frameHeight = sourceHeight.takeIf { it > 0f } ?: canvasHeight
+
+    val scale = maxOf(
+        canvasWidth / frameWidth,
+        canvasHeight / frameHeight
+    )
+
+    val displayedWidth = frameWidth * scale
+    val displayedHeight = frameHeight * scale
+
+    val offsetX = (canvasWidth - displayedWidth) / 2f
+    val offsetY = (canvasHeight - displayedHeight) / 2f
+
+    val px = landmark.first * frameWidth * scale + offsetX
+    val py = landmark.second * frameHeight * scale + offsetY
+
+    return Pair(px, py)
+}
 
 /**
  * Compute the two endpoints of the spine limb in canvas pixel coordinates.
@@ -62,15 +89,37 @@ internal fun projectLandmark(
 internal fun computeSpineEndpoints(
     landmarks: List<Triple<Float, Float, Float>>,
     canvasWidth: Float,
-    canvasHeight: Float
-): Pair<Pair<Float, Float>, Pair<Float, Float>> {
-    val shoulderMidX = (landmarks[11].first + landmarks[12].first) / 2f
-    val shoulderMidY = (landmarks[11].second + landmarks[12].second) / 2f
-    val hipMidX = (landmarks[23].first + landmarks[24].first) / 2f
-    val hipMidY = (landmarks[23].second + landmarks[24].second) / 2f
+    canvasHeight: Float,
+    sourceWidth: Float = canvasWidth,
+    sourceHeight: Float = canvasHeight,
+)
+//: Pair<Pair<Float, Float>, Pair<Float, Float>> {
+//    val shoulderMidX = (landmarks[11].first + landmarks[12].first) / 2f
+//    val shoulderMidY = (landmarks[11].second + landmarks[12].second) / 2f
+//    val hipMidX = (landmarks[23].first + landmarks[24].first) / 2f
+//    val hipMidY = (landmarks[23].second + landmarks[24].second) / 2f
+//    return Pair(
+//        Pair(shoulderMidX * canvasWidth, shoulderMidY * canvasHeight),
+//        Pair(hipMidX * canvasWidth, hipMidY * canvasHeight)
+//    )
+//}
+
+: Pair<Pair<Float, Float>, Pair<Float, Float>> {
+    val shoulderMid = Triple(
+        (landmarks[11].first + landmarks[12].first) / 2f,
+        (landmarks[11].second + landmarks[12].second) / 2f,
+        0f
+    )
+
+    val hipMid = Triple(
+        (landmarks[23].first + landmarks[24].first) / 2f,
+        (landmarks[23].second + landmarks[24].second) / 2f,
+        0f
+    )
+
     return Pair(
-        Pair(shoulderMidX * canvasWidth, shoulderMidY * canvasHeight),
-        Pair(hipMidX * canvasWidth, hipMidY * canvasHeight)
+        projectLandmark(shoulderMid, canvasWidth, canvasHeight, sourceWidth, sourceHeight),
+        projectLandmark(hipMid, canvasWidth, canvasHeight, sourceWidth, sourceHeight)
     )
 }
 
@@ -90,6 +139,8 @@ fun SkeletonOverlay(
     landmarks: List<Triple<Float, Float, Float>>,
     jointColors: List<Color> = List(LANDMARK_COUNT) { Color.Green },
     limbColors: List<Color> = List(LIMB_COUNT) { Color.Green },
+    sourceWidth: Int = 0,
+    sourceHeight: Int = 0,
     modifier: Modifier = Modifier
 ) {
     require(landmarks.size == LANDMARK_COUNT) {
@@ -109,16 +160,18 @@ fun SkeletonOverlay(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
+        val frameWidth = sourceWidth.takeIf { it > 0 }?.toFloat() ?: w
+        val frameHeight = sourceHeight.takeIf { it > 0 }?.toFloat() ?: h
 
         // Draw limbs first so joints render on top.
         LIMB_CONNECTIONS.forEachIndexed { index, (start, end) ->
             val color = limbColors[index]
             val (startPx, endPx) = if (start == -1) {
-                computeSpineEndpoints(landmarks, w, h)
+                computeSpineEndpoints(landmarks, w, h, frameWidth, frameHeight)
             } else {
                 Pair(
-                    projectLandmark(landmarks[start], w, h),
-                    projectLandmark(landmarks[end], w, h)
+                    projectLandmark(landmarks[start], w, h, frameWidth, frameHeight),
+                    projectLandmark(landmarks[end], w, h, frameWidth, frameHeight)
                 )
             }
             drawLine(
@@ -132,7 +185,7 @@ fun SkeletonOverlay(
 
         // Draw joint circles.
         landmarks.forEachIndexed { index, landmark ->
-            val (px, py) = projectLandmark(landmark, w, h)
+            val (px, py) = projectLandmark(landmark, w, h, frameWidth, frameHeight)
             drawCircle(
                 color = jointColors[index],
                 radius = jointRadiusPx,

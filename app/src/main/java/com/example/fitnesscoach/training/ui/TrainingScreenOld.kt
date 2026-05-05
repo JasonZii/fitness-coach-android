@@ -35,6 +35,7 @@ fun TrainingScreenOld(
     val context = LocalContext.current
     val viewModel: TrainingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
+    val landmarks by viewModel.skeletonState.collectAsState()
 
     // Load the correct exercise reference data once when the screen opens.
     LaunchedEffect(exerciseId) {
@@ -45,15 +46,16 @@ fun TrainingScreenOld(
 
         // ── Layer 1: live camera feed ─────────────────────────────────────────
         CameraPreview(
-            modifier = Modifier.fillMaxSize(),
-            context = context,
+            modifier       = Modifier.fillMaxSize(),
+            context        = context,
+            frameProcessor = viewModel.poseFrameProcessor,
             onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
         )
 
         // ── Layer 2: user skeleton overlay ───────────────────────────────────
-        if (uiState.landmarks.size == LANDMARK_COUNT) {
+        if (landmarks.size == LANDMARK_COUNT) {
             SkeletonOverlay(
-                landmarks   = uiState.landmarks,
+                landmarks   = landmarks,
                 jointColors = uiState.jointColors,
                 limbColors  = uiState.limbColors,
                 modifier    = Modifier.fillMaxSize()
