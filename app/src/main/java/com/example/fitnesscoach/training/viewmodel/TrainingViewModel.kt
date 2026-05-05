@@ -29,6 +29,7 @@ import com.example.fitnesscoach.training.pose.TrainingPauseState
 import com.example.fitnesscoach.training.pose.alignOeDtw
 import com.example.fitnesscoach.training.pose.detectCameraAngle
 import com.example.fitnesscoach.training.pose.detectSideViewDirection
+import com.example.fitnesscoach.training.pose.frameDist
 import com.example.fitnesscoach.training.pose.isFullBodyInFrame
 import com.example.fitnesscoach.training.pose.normalizeLandmarks
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,11 @@ import com.example.fitnesscoach.training.pose.PoseFrameProcessor
 private const val CAMERA_DIRECTION_WARNING_GRACE_MS = 1500L
 
 // OE-DTW sliding window: cap userSequence to avoid O(n) growth over time.
-private const val MAX_USER_SEQUENCE_FRAMES = 30
+private const val MAX_USER_SEQUENCE_FRAMES = 18
+private const val REFERENCE_SEARCH_BACK_FRAMES = 4
+private const val REFERENCE_SEARCH_FORWARD_FRAMES = 10
+private const val MAX_REFERENCE_BACKTRACK_FRAMES = 2
+private const val MAX_REFERENCE_FORWARD_JUMP_FRAMES = 6
 
 // Turn this on only when debugging camera direction.
 private const val ENABLE_DIRECTION_DEBUG_LOG = false
@@ -91,6 +96,8 @@ data class TrainingUiState(
     // ── Reference ghost skeleton (blue) ────────────────────────────────────────
     val matchedReferenceRawLandmarks: List<Triple<Float, Float, Float>> = emptyList(),
     val dynamicReferenceLandmarks: List<Triple<Float, Float, Float>> = emptyList(),
+    val cameraFrameWidth: Int = 0,
+    val cameraFrameHeight: Int = 0,
 
     // ── Rep tracking ──────────────────────────────────────────────────────────
     val repCount: Int = 0,
@@ -131,6 +138,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     private var wasTrainingPaused = false
     private var cameraDirectionMismatchSinceMs: Long? = null
+    private var lastMatchedReferenceIndex = -1
 
     // ── Reference sequences (@Volatile: written on IO thread, read on algorithmDispatcher) ──
     @Volatile private var referenceSequence:    List<List<Pair<Float, Float>>>          = emptyList()
@@ -197,6 +205,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                             cameraAngle = CameraAngle.AMBIGUOUS,
                             readiness = readiness,
                             phase = SessionPhase.READINESS,
+                            cameraFrameWidth = poseResult.imageWidth,
+                            cameraFrameHeight = poseResult.imageHeight,
                         )
                     }
                 }
@@ -247,6 +257,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             userSequence.clear()
             countRepsUseCase     = CountRepsUseCase(info.id)
             wasTrainingPaused    = false
+            lastMatchedReferenceIndex = -1
             cameraDirectionMismatchSinceMs = null
         }
 
@@ -285,6 +296,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             userSequence.clear()
             countRepsUseCase.reset()
             wasTrainingPaused              = false
+            lastMatchedReferenceIndex      = -1
             cameraDirectionMismatchSinceMs = null
         }
     }
@@ -319,6 +331,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 cameraAngle       = angle,
                 readiness         = readiness,
                 phase             = nextPhase,
+                cameraFrameWidth  = poseResult.imageWidth,
+                cameraFrameHeight = poseResult.imageHeight,
             )
         }
     }
@@ -339,6 +353,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     isFullBodyInFrame = fullBody,
                     cameraAngle       = angle,
                     isTrainingPaused  = true,
+                    cameraFrameWidth  = poseResult.imageWidth,
+                    cameraFrameHeight = poseResult.imageHeight,
                 )
             }
             return
@@ -375,6 +391,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             repScoreTracker.discardCurrentRep()
             userSequence.clear()
             countRepsUseCase.reset()
+            lastMatchedReferenceIndex = -1
         }
         wasTrainingPaused = isPaused
 
@@ -385,6 +402,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = true,
+                    cameraFrameWidth                = poseResult.imageWidth,
+                    cameraFrameHeight               = poseResult.imageHeight,
                 )
             }
             return
@@ -397,6 +416,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = false,
+                    cameraFrameWidth                = poseResult.imageWidth,
+                    cameraFrameHeight               = poseResult.imageHeight,
                 )
             }
             return
@@ -411,7 +432,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         }
 
         // Module 2: find matching reference frame.
-        val matchedIdx = alignOeDtw(userSequence, referenceSequence)
+        val dtwMatchedIdx = alignOeDtw(userSequence, referenceSequence)
+        val matchedIdx = stabiliseMatchedReferenceIndex(dtwMatchedIdx, normalized)
 
         // Module 3: score and colour.
         val scoreResult = evaluateUseCase.evaluate(
@@ -428,6 +450,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val updatedRepScores = if (repCompleted) {
             repScoreTracker.finishRep()
             userSequence.clear()
+            lastMatchedReferenceIndex = -1
             repScoreTracker.getCompletedRepScores()
         } else {
             _uiState.value.repScores
@@ -463,6 +486,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 limbColors                      = scoreResult.limbColors,
                 currentFrameScore               = scoreResult.sf,
                 matchedReferenceRawLandmarks    = matchedRaw,
+                cameraFrameWidth                = poseResult.imageWidth,
+                cameraFrameHeight               = poseResult.imageHeight,
                 repCount                        = updatedRepScores.size,
                 repScores                       = updatedRepScores,
                 correctReps                     = repScoreTracker.correctReps,
@@ -483,9 +508,44 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         return nowMs - mismatchSince >= CAMERA_DIRECTION_WARNING_GRACE_MS
     }
 
+    private fun stabiliseMatchedReferenceIndex(
+        dtwMatchedIdx: Int,
+        currentNormalized: List<Pair<Float, Float>>,
+    ): Int {
+        if (dtwMatchedIdx == -1 || referenceSequence.isEmpty()) return -1
+
+        val lastIdx = lastMatchedReferenceIndex
+        if (lastIdx == -1) {
+            lastMatchedReferenceIndex = dtwMatchedIdx
+            return dtwMatchedIdx
+        }
+
+        val searchStart = maxOf(0, lastIdx - REFERENCE_SEARCH_BACK_FRAMES)
+        val searchEnd = minOf(
+            referenceSequence.lastIndex,
+            lastIdx + REFERENCE_SEARCH_FORWARD_FRAMES
+        )
+        val localBestIdx = (searchStart..searchEnd).minByOrNull { idx ->
+            frameDist(currentNormalized, referenceSequence[idx])
+        } ?: dtwMatchedIdx
+
+        val candidate = if (dtwMatchedIdx in searchStart..searchEnd) {
+            if (localBestIdx >= lastIdx - MAX_REFERENCE_BACKTRACK_FRAMES) localBestIdx else dtwMatchedIdx
+        } else {
+            localBestIdx
+        }
+
+        val smoothed = candidate.coerceIn(
+            minimumValue = maxOf(0, lastIdx - MAX_REFERENCE_BACKTRACK_FRAMES),
+            maximumValue = minOf(referenceSequence.lastIndex, lastIdx + MAX_REFERENCE_FORWARD_JUMP_FRAMES)
+        )
+        lastMatchedReferenceIndex = smoothed
+        return smoothed
+    }
+
     /**
-     * Repositions raw reference landmarks onto the live user's body centre and scale.
-     * Both normalization and denormalization use the same torso-length scale factor.
+     * Repositions raw reference landmarks onto the live user's body centre, scale,
+     * and torso direction.
      */
     private fun repositionReference(
         refRaw: List<Triple<Float, Float, Float>>,
@@ -497,18 +557,35 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val userHipMidY      = (userRaw[LANDMARK_LEFT_HIP].second     + userRaw[LANDMARK_RIGHT_HIP].second)     / 2f
         val userShoulderMidX = (userRaw[LANDMARK_LEFT_SHOULDER].first  + userRaw[LANDMARK_RIGHT_SHOULDER].first)  / 2f
         val userShoulderMidY = (userRaw[LANDMARK_LEFT_SHOULDER].second + userRaw[LANDMARK_RIGHT_SHOULDER].second) / 2f
+        val refShoulderMidX =
+            (normalizedRef[LANDMARK_LEFT_SHOULDER].first + normalizedRef[LANDMARK_RIGHT_SHOULDER].first) / 2f
+        val refShoulderMidY =
+            (normalizedRef[LANDMARK_LEFT_SHOULDER].second + normalizedRef[LANDMARK_RIGHT_SHOULDER].second) / 2f
 
         val userTorsoLen = sqrt(
             (userShoulderMidX - userHipMidX) * (userShoulderMidX - userHipMidX) +
             (userShoulderMidY - userHipMidY) * (userShoulderMidY - userHipMidY)
         )
+        val refTorsoLen = sqrt(
+            refShoulderMidX * refShoulderMidX +
+            refShoulderMidY * refShoulderMidY
+        )
 
-        if (userTorsoLen < 1e-6f) return refRaw
+        if (userTorsoLen < 1e-6f || refTorsoLen < 1e-6f) return refRaw
+
+        val refUnitX = refShoulderMidX / refTorsoLen
+        val refUnitY = refShoulderMidY / refTorsoLen
+        val userUnitX = (userShoulderMidX - userHipMidX) / userTorsoLen
+        val userUnitY = (userShoulderMidY - userHipMidY) / userTorsoLen
+        val cos = refUnitX * userUnitX + refUnitY * userUnitY
+        val sin = refUnitX * userUnitY - refUnitY * userUnitX
 
         return normalizedRef.map { (nx, ny) ->
+            val rotatedX = nx * cos - ny * sin
+            val rotatedY = nx * sin + ny * cos
             Triple(
-                nx * userTorsoLen + userHipMidX,
-                ny * userTorsoLen + userHipMidY,
+                rotatedX * userTorsoLen + userHipMidX,
+                rotatedY * userTorsoLen + userHipMidY,
                 0f,
             )
         }

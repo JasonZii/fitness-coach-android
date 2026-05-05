@@ -31,8 +31,8 @@ private val LIMB_PAIRS = listOf(
 )
 
 private const val VISIBILITY_THRESHOLD = 0.5f
-private const val JOINT_RADIUS_PX = 10f
-private const val LIMB_STROKE_PX  = 6f
+private const val JOINT_RADIUS_PX = 6f
+private const val LIMB_STROKE_PX  = 3.5f
 
 class PoseFrameProcessor(context: Context) {
 
@@ -87,7 +87,10 @@ class PoseFrameProcessor(context: Context) {
             bitmap.recycle()
         } catch (e: Exception) {
             Log.e("POSE", "Processing failed", e)
-            onResult(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888), PoseResult(emptyList(), emptyList()))
+            onResult(
+                Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888),
+                PoseResult(emptyList(), emptyList(), imageWidth = 1, imageHeight = 1)
+            )
         } finally {
             imageProxy.close()
         }

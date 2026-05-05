@@ -53,23 +53,33 @@ class PoseLandmarkerHelper(context: Context) {
     fun detectSync(bitmap: Bitmap, timestampMs: Long): PoseResult =
         try {
             val mpImage = BitmapImageBuilder(bitmap).build()
-            mapResult(poseLandmarker.detectForVideo(mpImage, timestampMs))
+            mapResult(
+                result = poseLandmarker.detectForVideo(mpImage, timestampMs),
+                imageWidth = bitmap.width,
+                imageHeight = bitmap.height,
+            )
         } catch (e: Exception) {
             Log.e("POSE", "Pose detection failed", e)
-            PoseResult(emptyList(), emptyList())
+            PoseResult(emptyList(), emptyList(), bitmap.width, bitmap.height)
         }
 
     fun close() {
         poseLandmarker.close()
     }
 
-    private fun mapResult(result: PoseLandmarkerResult): PoseResult {
+    private fun mapResult(
+        result: PoseLandmarkerResult,
+        imageWidth: Int,
+        imageHeight: Int,
+    ): PoseResult {
         val landmarks = result.landmarks()
-        if (landmarks.isEmpty()) return PoseResult(emptyList(), emptyList())
+        if (landmarks.isEmpty()) return PoseResult(emptyList(), emptyList(), imageWidth, imageHeight)
         val firstPose = landmarks[0]
         return PoseResult(
             landmarks    = firstPose.map { Triple(it.x(), it.y(), it.z()) },
-            visibilities = firstPose.map { it.visibility().orElse(0f) }
+            visibilities = firstPose.map { it.visibility().orElse(0f) },
+            imageWidth = imageWidth,
+            imageHeight = imageHeight,
         )
     }
 }

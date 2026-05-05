@@ -119,6 +119,8 @@ fun TrainingScreen(
 //                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
                 jointColors = blueJointColors,
                 limbColors = blueLimbColors,
+                sourceWidth = uiState.cameraFrameWidth,
+                sourceHeight = uiState.cameraFrameHeight,
                 modifier = Modifier.fillMaxSize()
             )
         }

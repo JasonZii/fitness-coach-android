@@ -48,36 +48,34 @@ internal val LIMB_CONNECTIONS: List<Pair<Int, Int>> = listOf(
  * z is ignored per ALGORITHM.md §MediaPipe Output Format.
  */
 
-private const val CAMERA_IMAGE_WIDTH = 360f
-private const val CAMERA_IMAGE_HEIGHT = 480f
-
-
 internal fun projectLandmark(
     landmark: Triple<Float, Float, Float>,
     canvasWidth: Float,
-    canvasHeight: Float
+    canvasHeight: Float,
+    sourceWidth: Float = canvasWidth,
+    sourceHeight: Float = canvasHeight,
 )
 //: Pair<Float, Float> = Pair(
 //    landmark.first * canvasWidth,
 //    landmark.second * canvasHeight
 //)
 : Pair<Float, Float> {
-    val sourceWidth = CAMERA_IMAGE_WIDTH
-    val sourceHeight = CAMERA_IMAGE_HEIGHT
+    val frameWidth = sourceWidth.takeIf { it > 0f } ?: canvasWidth
+    val frameHeight = sourceHeight.takeIf { it > 0f } ?: canvasHeight
 
     val scale = maxOf(
-        canvasWidth / sourceWidth,
-        canvasHeight / sourceHeight
+        canvasWidth / frameWidth,
+        canvasHeight / frameHeight
     )
 
-    val displayedWidth = sourceWidth * scale
-    val displayedHeight = sourceHeight * scale
+    val displayedWidth = frameWidth * scale
+    val displayedHeight = frameHeight * scale
 
     val offsetX = (canvasWidth - displayedWidth) / 2f
     val offsetY = (canvasHeight - displayedHeight) / 2f
 
-    val px = landmark.first * sourceWidth * scale + offsetX
-    val py = landmark.second * sourceHeight * scale + offsetY
+    val px = landmark.first * frameWidth * scale + offsetX
+    val py = landmark.second * frameHeight * scale + offsetY
 
     return Pair(px, py)
 }
@@ -91,7 +89,9 @@ internal fun projectLandmark(
 internal fun computeSpineEndpoints(
     landmarks: List<Triple<Float, Float, Float>>,
     canvasWidth: Float,
-    canvasHeight: Float
+    canvasHeight: Float,
+    sourceWidth: Float = canvasWidth,
+    sourceHeight: Float = canvasHeight,
 )
 //: Pair<Pair<Float, Float>, Pair<Float, Float>> {
 //    val shoulderMidX = (landmarks[11].first + landmarks[12].first) / 2f
@@ -118,8 +118,8 @@ internal fun computeSpineEndpoints(
     )
 
     return Pair(
-        projectLandmark(shoulderMid, canvasWidth, canvasHeight),
-        projectLandmark(hipMid, canvasWidth, canvasHeight)
+        projectLandmark(shoulderMid, canvasWidth, canvasHeight, sourceWidth, sourceHeight),
+        projectLandmark(hipMid, canvasWidth, canvasHeight, sourceWidth, sourceHeight)
     )
 }
 
@@ -139,6 +139,8 @@ fun SkeletonOverlay(
     landmarks: List<Triple<Float, Float, Float>>,
     jointColors: List<Color> = List(LANDMARK_COUNT) { Color.Green },
     limbColors: List<Color> = List(LIMB_COUNT) { Color.Green },
+    sourceWidth: Int = 0,
+    sourceHeight: Int = 0,
     modifier: Modifier = Modifier
 ) {
     require(landmarks.size == LANDMARK_COUNT) {
@@ -158,16 +160,18 @@ fun SkeletonOverlay(
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
+        val frameWidth = sourceWidth.takeIf { it > 0 }?.toFloat() ?: w
+        val frameHeight = sourceHeight.takeIf { it > 0 }?.toFloat() ?: h
 
         // Draw limbs first so joints render on top.
         LIMB_CONNECTIONS.forEachIndexed { index, (start, end) ->
             val color = limbColors[index]
             val (startPx, endPx) = if (start == -1) {
-                computeSpineEndpoints(landmarks, w, h)
+                computeSpineEndpoints(landmarks, w, h, frameWidth, frameHeight)
             } else {
                 Pair(
-                    projectLandmark(landmarks[start], w, h),
-                    projectLandmark(landmarks[end], w, h)
+                    projectLandmark(landmarks[start], w, h, frameWidth, frameHeight),
+                    projectLandmark(landmarks[end], w, h, frameWidth, frameHeight)
                 )
             }
             drawLine(
@@ -181,7 +185,7 @@ fun SkeletonOverlay(
 
         // Draw joint circles.
         landmarks.forEachIndexed { index, landmark ->
-            val (px, py) = projectLandmark(landmark, w, h)
+            val (px, py) = projectLandmark(landmark, w, h, frameWidth, frameHeight)
             drawCircle(
                 color = jointColors[index],
                 radius = jointRadiusPx,
