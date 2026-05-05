@@ -31,6 +31,7 @@ import com.example.fitnesscoach.training.pose.detectCameraAngle
 import com.example.fitnesscoach.training.pose.detectSideViewDirection
 import com.example.fitnesscoach.training.pose.frameDist
 import com.example.fitnesscoach.training.pose.isFullBodyInFrame
+import com.example.fitnesscoach.training.pose.isUpperBodyInFrame
 import com.example.fitnesscoach.training.pose.normalizeLandmarks
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -312,8 +313,10 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     // Runs on algorithmDispatcher. No landmark update here — handled by fast path.
     private fun processReadinessFrame(poseResult: PoseResult) {
-        val fullBody = !requiresFullBody ||
+        val fullBody = if (requiresFullBody)
             isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
+        else
+            isUpperBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
         val conditionsMet = fullBody && angle == requiredCameraAngle
@@ -345,7 +348,10 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         if (!_uiState.value.isReferenceLoaded) return
 
         val angle = detectCameraAngle(poseResult.landmarks)
-        val fullBody = isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
+        val fullBody = if (requiresFullBody)
+            isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
+        else
+            isUpperBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         val userIsValid = fullBody && angle == requiredCameraAngle
 
         if (!userIsValid) {

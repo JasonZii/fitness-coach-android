@@ -3,23 +3,37 @@ package com.example.fitnesscoach.training.pose
 import com.example.fitnesscoach.core.util.Constants.CAMERA_ANGLE_FRONT_SPREAD_RATIO_MIN
 import com.example.fitnesscoach.core.util.Constants.CAMERA_ANGLE_SIDE_SPREAD_RATIO_MAX
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ANKLE
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_KNEE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_WRIST
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_NOSE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_ANKLE
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_KNEE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_WRIST
 import com.example.fitnesscoach.core.util.Constants.VISIBILITY_IN_FRAME_MIN
 import kotlin.math.abs
 
 // Bilateral landmark pairs (left, right) - shoulder / hip / knee / ankle
 private val BILATERAL_PAIRS = listOf(
     LANDMARK_LEFT_SHOULDER to LANDMARK_RIGHT_SHOULDER,
-    LANDMARK_LEFT_HIP to LANDMARK_RIGHT_HIP,
-    LANDMARK_LEFT_KNEE to LANDMARK_RIGHT_KNEE,
-    LANDMARK_LEFT_ANKLE to LANDMARK_RIGHT_ANKLE,
+    LANDMARK_LEFT_HIP      to LANDMARK_RIGHT_HIP,
+    LANDMARK_LEFT_KNEE     to LANDMARK_RIGHT_KNEE,
+    LANDMARK_LEFT_ANKLE    to LANDMARK_RIGHT_ANKLE,
+    LANDMARK_LEFT_ELBOW to LANDMARK_RIGHT_ELBOW,
+    LANDMARK_LEFT_WRIST to LANDMARK_RIGHT_WRIST,
+)
+
+// Upper-body bilateral pairs (left, right) - shoulder / elbow / wrist / hip
+private val UPPER_BODY_BILATERAL_PAIRS = listOf(
+    LANDMARK_LEFT_SHOULDER to LANDMARK_RIGHT_SHOULDER,
+    LANDMARK_LEFT_ELBOW    to LANDMARK_RIGHT_ELBOW,
+    LANDMARK_LEFT_WRIST    to LANDMARK_RIGHT_WRIST,
+    LANDMARK_LEFT_HIP      to LANDMARK_RIGHT_HIP,
 )
 
 /**
@@ -71,6 +85,32 @@ fun isFullBodyInFrame(
         }
         ReadinessVisibilityMode.BOTH_VISIBLE_SIDES -> {
             BILATERAL_PAIRS.all { (left, right) ->
+                visibilities[left] > VISIBILITY_IN_FRAME_MIN && visibilities[right] > VISIBILITY_IN_FRAME_MIN
+            }
+        }
+    }
+}
+
+/**
+ * Returns true when upper-body landmarks are visible in the frame.
+ *
+ * Used when [requiresFullBody] is false (e.g. shoulder press, lateral raise, bicep curl).
+ * Checks nose + shoulder / elbow / wrist / hip bilateral pairs, applying the same
+ * [ReadinessVisibilityMode] logic as [isFullBodyInFrame].
+ */
+fun isUpperBodyInFrame(
+    visibilities: List<Float>,
+    visibilityMode: ReadinessVisibilityMode,
+): Boolean {
+    if (visibilities[LANDMARK_NOSE] <= VISIBILITY_IN_FRAME_MIN) return false
+    return when (visibilityMode) {
+        ReadinessVisibilityMode.ANY_VISIBLE_SIDE -> {
+            UPPER_BODY_BILATERAL_PAIRS.all { (left, right) ->
+                visibilities[left] > VISIBILITY_IN_FRAME_MIN || visibilities[right] > VISIBILITY_IN_FRAME_MIN
+            }
+        }
+        ReadinessVisibilityMode.BOTH_VISIBLE_SIDES -> {
+            UPPER_BODY_BILATERAL_PAIRS.all { (left, right) ->
                 visibilities[left] > VISIBILITY_IN_FRAME_MIN && visibilities[right] > VISIBILITY_IN_FRAME_MIN
             }
         }
