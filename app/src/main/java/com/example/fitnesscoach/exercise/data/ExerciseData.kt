@@ -81,7 +81,7 @@ val exerciseList = listOf(
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
         keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
-        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
         id = "bicep_curl",
@@ -152,6 +152,6 @@ val exerciseList = listOf(
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
         keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
-        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
+        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
 )

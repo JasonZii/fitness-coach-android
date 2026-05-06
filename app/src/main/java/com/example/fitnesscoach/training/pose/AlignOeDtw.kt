@@ -1,6 +1,7 @@
 package com.example.fitnesscoach.training.pose
 
 import com.example.fitnesscoach.core.util.Constants.OE_DTW_MIN_FRAMES
+import com.example.fitnesscoach.core.util.Constants.SCORE_Z_WEIGHT
 import kotlin.math.sqrt
 
 /**
@@ -19,15 +20,15 @@ import kotlin.math.sqrt
  *   - The matched reference index is argmin over the final row.
  *
  * @param userSequence      Normalised frames from training start to now.
- *                          Each frame is a list of 33 (x, y) pairs.
+ *                          Each frame is a list of 33 (x, y, z) triples.
  * @param referenceSequence Complete normalised standard-action sequence.
- *                          Each frame is a list of 33 (x, y) pairs.
+ *                          Each frame is a list of 33 (x, y, z) triples.
  * @return Index in [referenceSequence] that best matches the last user frame,
  *         or -1 if [userSequence] has fewer than [OE_DTW_MIN_FRAMES] frames.
  */
 fun alignOeDtw(
-    userSequence: List<List<Pair<Float, Float>>>,
-    referenceSequence: List<List<Pair<Float, Float>>>
+    userSequence: List<List<Triple<Float, Float, Float>>>,
+    referenceSequence: List<List<Triple<Float, Float, Float>>>
 ): Int {
     if (userSequence.size < OE_DTW_MIN_FRAMES) return -1
 
@@ -65,14 +66,15 @@ fun alignOeDtw(
  * Both lists must have the same size (33 landmarks).
  */
 internal fun frameDist(
-    a: List<Pair<Float, Float>>,
-    b: List<Pair<Float, Float>>
+    a: List<Triple<Float, Float, Float>>,
+    b: List<Triple<Float, Float, Float>>
 ): Float {
     var sum = 0f
     for (k in a.indices) {
         val dx = a[k].first - b[k].first
         val dy = a[k].second - b[k].second
-        sum += sqrt(dx * dx + dy * dy)
+        val dz = (a[k].third - b[k].third) * SCORE_Z_WEIGHT
+        sum += sqrt(dx * dx + dy * dy + dz * dz)
     }
     return sum / a.size
 }

@@ -28,12 +28,12 @@ private val BILATERAL_PAIRS = listOf(
     LANDMARK_LEFT_WRIST to LANDMARK_RIGHT_WRIST,
 )
 
-// Upper-body bilateral pairs (left, right) - shoulder / elbow / wrist / hip
+// Upper-body bilateral pairs (left, right) - shoulder / elbow / wrist.
+// Hips are intentionally optional for cropped upper-body exercises.
 private val UPPER_BODY_BILATERAL_PAIRS = listOf(
     LANDMARK_LEFT_SHOULDER to LANDMARK_RIGHT_SHOULDER,
     LANDMARK_LEFT_ELBOW    to LANDMARK_RIGHT_ELBOW,
     LANDMARK_LEFT_WRIST    to LANDMARK_RIGHT_WRIST,
-    LANDMARK_LEFT_HIP      to LANDMARK_RIGHT_HIP,
 )
 
 /**
@@ -95,7 +95,7 @@ fun isFullBodyInFrame(
  * Returns true when upper-body landmarks are visible in the frame.
  *
  * Used when [requiresFullBody] is false (e.g. shoulder press, lateral raise, bicep curl).
- * Checks nose + shoulder / elbow / wrist / hip bilateral pairs, applying the same
+ * Checks nose + shoulder / elbow / wrist bilateral pairs, applying the same
  * [ReadinessVisibilityMode] logic as [isFullBodyInFrame].
  */
 fun isUpperBodyInFrame(

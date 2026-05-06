@@ -29,7 +29,7 @@ class EvaluateExerciseUseCase {
      * @param matchedReferenceIndex  Index returned by OE-DTW. Pass -1 during the
      *                               warm-up period (< 20 frames); all colors will
      *                               be green and sf will be 100.
-     * @param userLandmarks          33 normalised (x, y) pairs for the current frame.
+     * @param userLandmarks          33 normalised (x, y, z) triples for the current frame.
      * @param referenceSequence      Full normalised standard action sequence.
      * @param upperBodyOnly          Pass `true` for exercises whose [ExerciseInfo.requiresFullBody]
      *                               is false. Lower-body joints and limbs are excluded from scoring
@@ -38,12 +38,20 @@ class EvaluateExerciseUseCase {
      */
     fun evaluate(
         matchedReferenceIndex: Int,
-        userLandmarks: List<Pair<Float, Float>>,
-        referenceSequence: List<List<Pair<Float, Float>>>,
+        userLandmarks: List<Triple<Float, Float, Float>>,
+        referenceSequence: List<List<Triple<Float, Float, Float>>>,
         upperBodyOnly: Boolean = false,
+        exerciseId: String = "",
     ): PoseScoreResult {
         if (matchedReferenceIndex == -1) return allGreenResult
         val referenceLandmarks = referenceSequence[matchedReferenceIndex]
-        return PoseScoringEngine.calculatePoseScore(userLandmarks, referenceLandmarks, upperBodyOnly)
+        return PoseScoringEngine.calculatePoseScore(
+            userLandmarks.map { it.first to it.second },
+            referenceLandmarks.map { it.first to it.second },
+            upperBodyOnly,
+            bicepCurlOnly = exerciseId == "bicep_curl",
+            squatOnly = exerciseId == "squat",
+            lungeOnly = exerciseId == "right_leg_lunge_to_knee_raise"
+        )
     }
 }

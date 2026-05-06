@@ -142,11 +142,11 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private var lastMatchedReferenceIndex = -1
 
     // ── Reference sequences (@Volatile: written on IO thread, read on algorithmDispatcher) ──
-    @Volatile private var referenceSequence:    List<List<Pair<Float, Float>>>          = emptyList()
+    @Volatile private var referenceSequence:    List<List<Triple<Float, Float, Float>>> = emptyList()
     @Volatile private var rawReferenceSequence: List<List<Triple<Float, Float, Float>>> = emptyList()
 
     // OE-DTW input — only accessed from algorithmDispatcher (single-threaded, no lock needed).
-    private val userSequence = mutableListOf<List<Pair<Float, Float>>>()
+    private val userSequence = mutableListOf<List<Triple<Float, Float, Float>>>()
 
     // ── Exercise config (@Volatile: written on main thread, read on algorithmDispatcher) ──
     @Volatile private var requiredCameraAngle: CameraAngle = CameraAngle.SIDE
@@ -319,7 +319,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             isUpperBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         val angle    = detectCameraAngle(poseResult.landmarks)
 
-        val conditionsMet = fullBody && angle == requiredCameraAngle
+        val conditionsMet = fullBody && isCameraAngleValidForReadiness(angle)
         val readiness     = readinessMachine.update(conditionsMet, System.currentTimeMillis())
 
         val nextPhase = if (readiness.phase == ReadinessPhase.TRAINING_STARTED)
@@ -352,7 +352,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
         else
             isUpperBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
-        val userIsValid = fullBody && angle == requiredCameraAngle
+        val userIsValid = fullBody && isCameraAngleValidForReadiness(angle)
 
         if (!userIsValid) {
             _uiState.update { state ->
@@ -449,6 +449,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val scoreResult = evaluateUseCase.evaluate(
             matchedIdx, normalized, referenceSequence,
             upperBodyOnly = !requiresFullBody,
+            exerciseId = currentExerciseId,
         )
 
         // Module 4: accumulate per-frame score.
@@ -518,9 +519,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         return nowMs - mismatchSince >= CAMERA_DIRECTION_WARNING_GRACE_MS
     }
 
+    private fun isCameraAngleValidForReadiness(angle: CameraAngle): Boolean {
+        if (!requiresFullBody && requiredCameraAngle == CameraAngle.FRONT) return true
+        return angle == requiredCameraAngle
+    }
+
     private fun stabiliseMatchedReferenceIndex(
         dtwMatchedIdx: Int,
-        currentNormalized: List<Pair<Float, Float>>,
+        currentNormalized: List<Triple<Float, Float, Float>>,
     ): Int {
         if (dtwMatchedIdx == -1 || referenceSequence.isEmpty()) return -1
 
@@ -590,7 +596,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val cos = refUnitX * userUnitX + refUnitY * userUnitY
         val sin = refUnitX * userUnitY - refUnitY * userUnitX
 
-        return normalizedRef.map { (nx, ny) ->
+        return normalizedRef.map { (nx, ny, _) ->
             val rotatedX = nx * cos - ny * sin
             val rotatedY = nx * sin + ny * cos
             Triple(
