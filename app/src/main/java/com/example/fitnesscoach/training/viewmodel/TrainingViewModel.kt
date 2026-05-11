@@ -13,6 +13,7 @@ import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
 import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
+import com.example.fitnesscoach.core.util.Constants.MAX_CONSECUTIVE_RED_FRAMES
 import kotlin.math.sqrt
 import com.example.fitnesscoach.training.core.RepScoreTracker
 import com.example.fitnesscoach.training.domain.CountRepsUseCase
@@ -347,6 +348,16 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private fun processTrainingFrame(poseResult: PoseResult) {
         if (!_uiState.value.isReferenceLoaded) return
 
+        val allGreenJointColors = List(LANDMARK_COUNT) { Color.Green }
+        val allGreenLimbColors = List(LIMB_COUNT) { Color.Green }
+
+        fun clearCachedSkeletonColors() {
+            poseFrameProcessor.updateColors(
+                jointArgbColors = IntArray(LANDMARK_COUNT) { android.graphics.Color.GREEN },
+                limbArgbColors = IntArray(LIMB_COUNT) { android.graphics.Color.GREEN },
+            )
+        }
+
         val angle = detectCameraAngle(poseResult.landmarks)
         val fullBody = if (requiresFullBody)
             isFullBodyInFrame(poseResult.visibilities, readinessVisibilityMode)
@@ -360,11 +371,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     isFullBodyInFrame = fullBody,
                     cameraAngle       = angle,
                     isTrainingPaused  = true,
+                    jointColors = allGreenJointColors,
+                    limbColors = allGreenLimbColors,
                     matchedReferenceRawLandmarks = emptyList(),
                     cameraFrameWidth  = poseResult.imageWidth,
                     cameraFrameHeight = poseResult.imageHeight,
                 )
             }
+            clearCachedSkeletonColors()
             return
         }
 
@@ -410,11 +424,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = true,
+                    jointColors                      = allGreenJointColors,
+                    limbColors                       = allGreenLimbColors,
                     matchedReferenceRawLandmarks    = emptyList(),
                     cameraFrameWidth                = poseResult.imageWidth,
                     cameraFrameHeight               = poseResult.imageHeight,
                 )
             }
+            clearCachedSkeletonColors()
             return
         }
 
@@ -425,11 +442,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                     cameraAngle                     = angle,
                     isCameraDirectionWarningVisible = showDirectionWarning,
                     isTrainingPaused                = false,
+                    jointColors                     = allGreenJointColors,
+                    limbColors                      = allGreenLimbColors,
                     matchedReferenceRawLandmarks    = emptyList(),
                     cameraFrameWidth                = poseResult.imageWidth,
                     cameraFrameHeight               = poseResult.imageHeight,
                 )
             }
+            clearCachedSkeletonColors()
             return
         }
 
@@ -455,6 +475,14 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Module 4: accumulate per-frame score.
         val hasRedLimb = scoreResult.limbColors.any { it == Color.Red }
         repScoreTracker.addFrameScore(scoreResult.sf, hasRedLimb)
+        val shouldShowRed =
+            repScoreTracker.currentConsecutiveRedFrames > MAX_CONSECUTIVE_RED_FRAMES
+        val visualJointColors =
+            if (shouldShowRed) scoreResult.jointColors
+            else allGreenJointColors
+        val visualLimbColors =
+            if (shouldShowRed) scoreResult.limbColors
+            else allGreenLimbColors
 
         // Module 4: rep detection.
         val repCompleted = countRepsUseCase.update(poseResult.landmarks, poseResult.visibilities)
@@ -478,12 +506,12 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // The scoring engine only produces Color.Red or Color.Green, so we map
         // directly to Android ARGB ints — no Compose toArgb() import needed.
         poseFrameProcessor.updateColors(
-            jointArgbColors = IntArray(scoreResult.jointColors.size) { i ->
-                if (scoreResult.jointColors[i] == Color.Red) android.graphics.Color.RED
+            jointArgbColors = IntArray(visualJointColors.size) { i ->
+                if (visualJointColors[i] == Color.Red) android.graphics.Color.RED
                 else android.graphics.Color.GREEN
             },
-            limbArgbColors = IntArray(scoreResult.limbColors.size) { i ->
-                if (scoreResult.limbColors[i] == Color.Red) android.graphics.Color.RED
+            limbArgbColors = IntArray(visualLimbColors.size) { i ->
+                if (visualLimbColors[i] == Color.Red) android.graphics.Color.RED
                 else android.graphics.Color.GREEN
             }
         )
@@ -493,8 +521,8 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 isFullBodyInFrame              = fullBody,
                 cameraAngle                     = angle,
                 isCameraDirectionWarningVisible = showDirectionWarning,
-                jointColors                     = scoreResult.jointColors,
-                limbColors                      = scoreResult.limbColors,
+                jointColors                     = visualJointColors,
+                limbColors                      = visualLimbColors,
                 currentFrameScore               = scoreResult.sf,
                 matchedReferenceRawLandmarks    = matchedRaw,
                 cameraFrameWidth                = poseResult.imageWidth,
