@@ -37,6 +37,7 @@ object Constants {
     // Module 3: Per-landmark scoring
     // Joint/limb score below this threshold → RED; at or above → GREEN
     const val SCORE_RED_THRESHOLD = 83f
+    const val SCORE_Z_WEIGHT = 0.1f
     // Weight of joint-position score S1 in the overall frame score Sf
     const val SCORE_WEIGHT_S1 = 0.2f
     // Weight of limb-angle score S2 in the overall frame score Sf

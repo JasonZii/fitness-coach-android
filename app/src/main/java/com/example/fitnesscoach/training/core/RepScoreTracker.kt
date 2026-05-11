@@ -9,6 +9,9 @@ class RepScoreTracker {
     // ── Red Light Tracking (Correct/Incorrect Logic) ──
     private var currentConsecutiveRed = 0
     private var maxConsecutiveRed = 0
+
+    val currentConsecutiveRedFrames: Int
+        get() = currentConsecutiveRed
     
     // ── Final Rep Counts ──
     var correctReps = 0

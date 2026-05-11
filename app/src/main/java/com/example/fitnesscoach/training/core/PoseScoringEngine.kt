@@ -56,10 +56,16 @@ object PoseScoringEngine {
     // Limb indices that belong to the upper body (arms, torso lines, shoulder line, spine).
     // When upperBodyOnly = true, only these are included in S2 and colour decisions.
     private val UPPER_BODY_LIMB_INDICES = setOf(0, 1, 2, 3, 4, 5, 10, 12)
+    private val BICEP_CURL_LIMB_INDICES = setOf(2, 3)
+    private val SQUAT_LIMB_INDICES = setOf(4, 5, 6, 7, 8, 9, 11, 12)
+    private val LUNGE_LIMB_INDICES = setOf(4, 5, 6, 7, 8, 9, 11, 12)
 
     // Joint indices included in S1 when upperBodyOnly = true.
     // Hips (23, 24) are included because they anchor the torso limbs and spine.
     private val UPPER_BODY_JOINT_INDICES = setOf(11, 12, 13, 14, 15, 16, 23, 24)
+    private val BICEP_CURL_JOINT_INDICES = setOf(12, 14, 16)
+    private val SQUAT_JOINT_INDICES = setOf(11, 12, 23, 24, 25, 26, 27, 28)
+    private val LUNGE_JOINT_INDICES = setOf(11, 12, 23, 24, 25, 26, 27, 28)
 
     // Maps each joint index to the limb indices it belongs to.
     // Joints not listed here (e.g. face, hands, feet) have no connected scored limb → always green.
@@ -108,6 +114,9 @@ object PoseScoringEngine {
         userLandmarks: List<Pair<Float, Float>>,
         referenceLandmarks: List<Pair<Float, Float>>,
         upperBodyOnly: Boolean = false,
+        bicepCurlOnly: Boolean = false,
+        squatOnly: Boolean = false,
+        lungeOnly: Boolean = false,
     ): PoseScoreResult {
         require(userLandmarks.size == LANDMARK_COUNT) {
             "userLandmarks size must be $LANDMARK_COUNT"
@@ -118,17 +127,27 @@ object PoseScoringEngine {
 
         val user = userLandmarks.map { Point(it.first, it.second) }
         val ref = referenceLandmarks.map { Point(it.first, it.second) }
+        val activeLimbIndices = when {
+            lungeOnly -> LUNGE_LIMB_INDICES
+            squatOnly -> SQUAT_LIMB_INDICES
+            bicepCurlOnly -> BICEP_CURL_LIMB_INDICES
+            upperBodyOnly -> UPPER_BODY_LIMB_INDICES
+            else -> limbs.indices.toSet()
+        }
+        val activeJointIndices = when {
+            lungeOnly -> LUNGE_JOINT_INDICES
+            squatOnly -> SQUAT_JOINT_INDICES
+            bicepCurlOnly -> BICEP_CURL_JOINT_INDICES
+            upperBodyOnly -> UPPER_BODY_JOINT_INDICES
+            else -> 0 until LANDMARK_COUNT
+        }
 
         // Step 1: joint position scores (all 33 computed; S1 averaged over active set only)
         val jointScores = (0 until LANDMARK_COUNT).map { p ->
             val dp = distance(user[p], ref[p])
             ((1f - dp) * 100f).coerceIn(0f, 100f)
         }
-        val s1 = if (upperBodyOnly) {
-            UPPER_BODY_JOINT_INDICES.map { jointScores[it] }.average().toFloat()
-        } else {
-            jointScores.average().toFloat()
-        }
+        val s1 = activeJointIndices.map { jointScores[it] }.average().toFloat()
 
         // Step 2: limb angle scores (all 13 computed; S2 averaged over active set only)
         val limbScores = limbs.mapIndexed { _, limb ->
@@ -137,11 +156,7 @@ object PoseScoringEngine {
             val angleDiff = angleBetween(userVector, refVector)
             ((1f - angleDiff / 180f) * 100f).coerceIn(0f, 100f)
         }
-        val s2 = if (upperBodyOnly) {
-            UPPER_BODY_LIMB_INDICES.map { limbScores[it] }.average().toFloat()
-        } else {
-            limbScores.average().toFloat()
-        }
+        val s2 = activeLimbIndices.map { limbScores[it] }.average().toFloat()
 
         // Step 3: overall score
         val sf = (SCORE_WEIGHT_S1 * s1 + SCORE_WEIGHT_S2 * s2).coerceIn(0f, 100f)
@@ -150,14 +165,13 @@ object PoseScoringEngine {
         // When upperBodyOnly, lower-body limbs are always green and joint colours only
         // consider their upper-body connected limbs, preventing misleading red highlights.
         val limbColors = limbScores.mapIndexed { idx, score ->
-            if ((!upperBodyOnly || idx in UPPER_BODY_LIMB_INDICES) && score < SCORE_RED_THRESHOLD) RED else GREEN
+            if (idx in activeLimbIndices && score < SCORE_RED_THRESHOLD) RED else GREEN
         }
 
         val jointColors = (0 until LANDMARK_COUNT).map { jointIdx ->
             val connectedLimbs = JOINT_LIMB_MAP[jointIdx]
             if (connectedLimbs != null && connectedLimbs.any { limbIdx ->
-                    (!upperBodyOnly || limbIdx in UPPER_BODY_LIMB_INDICES) &&
-                    limbScores[limbIdx] < SCORE_RED_THRESHOLD
+                    limbIdx in activeLimbIndices && limbScores[limbIdx] < SCORE_RED_THRESHOLD
                 }) RED else GREEN
         }
 

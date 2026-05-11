@@ -84,12 +84,12 @@ fun loadRawReferenceSequence(
  * @param context       Android Context used to open the asset file.
  * @param assetFileName File name inside assets/landmarks/, e.g. "squat.json".
  * @return Normalised reference sequence: outer index = frame, inner index =
- *         landmark (0–32), value = normalised (x, y) pair.
+ *         landmark (0–32), value = normalised (x, y, z) triple.
  */
 fun loadReferenceSequence(
     context: Context,
     assetFileName: String,
-): List<List<Pair<Float, Float>>> {
+): List<List<Triple<Float, Float, Float>>> {
     val json = context.assets
         .open("landmarks/$assetFileName")
         .bufferedReader()

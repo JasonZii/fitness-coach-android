@@ -1,5 +1,6 @@
 package com.example.fitnesscoach.training.domain
 
+import android.util.Log
 import com.example.fitnesscoach.core.util.Constants.BICEP_CURL_S1_ANGLE
 import com.example.fitnesscoach.core.util.Constants.BICEP_CURL_S3_ANGLE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ELBOW
@@ -23,6 +24,12 @@ import com.example.fitnesscoach.core.util.Constants.SQUAT_S3_ANGLE
 import com.example.fitnesscoach.core.util.Constants.VISIBILITY_IN_FRAME_MIN
 import kotlin.math.acos
 import kotlin.math.sqrt
+
+private const val BICEP_CURL_ID = "bicep_curl"
+private const val BICEP_CURL_MOVE_ENTER_ANGLE = 150f
+private const val BICEP_CURL_TOP_LEAVE_ANGLE = 90f
+private const val BICEP_CURL_COOLDOWN_FRAMES = 8
+private const val REP_COUNTER_LOG_TAG = "RepCounter"
 
 /**
  * Module 4 — Rep-counting state machine supporting all 5 exercises.
@@ -73,14 +80,21 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
      * @param s3Angle     Angle boundary between S2 and S3.
      * @param s3HasLarger `true`  → S3 reached by angle INCREASING (shoulder press, lateral raise).
      *                   `false` → S3 reached by angle DECREASING (squat, lunge, bicep curl).
+     * @param s1ExitAngle Optional hysteresis threshold for leaving S1.
+     * @param s3ExitAngle Optional hysteresis threshold for leaving S3.
+     * @param cooldownFrames Number of frames to ignore after a completed rep.
      */
     private class SideState(
         private val s1Angle:     Float,
         private val s3Angle:     Float,
         private val s3HasLarger: Boolean,
+        private val s1ExitAngle: Float = s1Angle,
+        private val s3ExitAngle: Float = s3Angle,
+        private val cooldownFrames: Int = 0,
     ) {
         var repState:     RepState = RepState.S1; private set
         var hasVisitedS3: Boolean  = false;       private set
+        var cooldownRemaining: Int = 0; private set
 
         /**
          * A full S1→S2→S3→S2→S1 cycle has completed.
@@ -90,6 +104,10 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
 
         /** Advances the state machine by one frame with [angle] (degrees). */
         fun advance(angle: Float) {
+            if (cooldownRemaining > 0) {
+                cooldownRemaining--
+                return
+            }
             if (s3HasLarger) advanceIncreasing(angle) else advanceDecreasing(angle)
         }
 
@@ -100,9 +118,8 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
         private fun advanceDecreasing(angle: Float) {
             when (repState) {
                 RepState.S1 -> {
-                    if (angle < s1Angle) {
-                        repState     = RepState.S2
-                        hasVisitedS3 = false
+                    if (angle < s1ExitAngle) {
+                        repState = RepState.S2
                     }
                 }
                 RepState.S2 -> when {
@@ -113,7 +130,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                     }
                 }
                 RepState.S3 -> {
-                    if (angle > s3Angle) repState = RepState.S2
+                    if (angle > s3ExitAngle) repState = RepState.S2
                 }
             }
         }
@@ -126,8 +143,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             when (repState) {
                 RepState.S1 -> {
                     if (angle > s1Angle) {
-                        repState     = RepState.S2
-                        hasVisitedS3 = false
+                        repState = RepState.S2
                     }
                 }
                 RepState.S2 -> when {
@@ -143,10 +159,17 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             }
         }
 
+        fun consumeCompleted() {
+            hasCompleted = false
+            hasVisitedS3 = false
+            cooldownRemaining = cooldownFrames
+        }
+
         fun reset() {
             repState     = RepState.S1
             hasVisitedS3 = false
             hasCompleted = false
+            cooldownRemaining = 0
         }
     }
 
@@ -177,14 +200,31 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
         val s3Angle:     Float,
         /** true  → S3 is the HIGH angle; false → S3 is the LOW angle. */
         val s3HasLarger: Boolean,
+        val s1ExitAngle: Float = s1Angle,
+        val s3ExitAngle: Float = s3Angle,
+        val cooldownFrames: Int = 0,
         // ── Mode ─────────────────────────────────────────────────────────────
         /** true for front-view exercises that require both arms to move. */
         val isBilateral: Boolean,
     )
 
     private val config    = buildConfig(exerciseId)
-    private val rightSide = SideState(config.s1Angle, config.s3Angle, config.s3HasLarger)
-    private val leftSide  = SideState(config.s1Angle, config.s3Angle, config.s3HasLarger)
+    private val rightSide = SideState(
+        config.s1Angle,
+        config.s3Angle,
+        config.s3HasLarger,
+        config.s1ExitAngle,
+        config.s3ExitAngle,
+        config.cooldownFrames,
+    )
+    private val leftSide  = SideState(
+        config.s1Angle,
+        config.s3Angle,
+        config.s3HasLarger,
+        config.s1ExitAngle,
+        config.s3ExitAngle,
+        config.cooldownFrames,
+    )
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -225,10 +265,10 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
 
         rightSide.advance(angle)
 
-        return if (rightSide.hasCompleted) {
-            rightSide.hasCompleted = false
-            true
-        } else false
+        val repCompleted = rightSide.hasCompleted
+        if (repCompleted) rightSide.consumeCompleted()
+        logBicepCurlFrame(angle, repCompleted)
+        return repCompleted
     }
 
     // ── Bilateral update (front-view exercises) ───────────────────────────────
@@ -251,10 +291,20 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
 
         // Count a rep only when both sides have independently completed a cycle.
         return if (rightSide.hasCompleted && leftSide.hasCompleted) {
-            rightSide.hasCompleted = false
-            leftSide.hasCompleted  = false
+            rightSide.consumeCompleted()
+            leftSide.consumeCompleted()
             true
         } else false
+    }
+
+    private fun logBicepCurlFrame(angle: Float, repCompleted: Boolean) {
+        if (exerciseId != BICEP_CURL_ID) return
+        Log.d(
+            REP_COUNTER_LOG_TAG,
+            "bicep_curl angle=$angle state=${rightSide.repState} " +
+                "hasVisitedS3=${rightSide.hasVisitedS3} repCompleted=$repCompleted " +
+                "cooldownRemaining=${rightSide.cooldownRemaining}"
+        )
     }
 
     // ── Angle calculation ─────────────────────────────────────────────────────
@@ -366,7 +416,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             //     elbow angle from side-view curl recordings in Sprint 4.
             //   - If the shoulder rotates forward during the curl, the angle may become
             //     noisy. Consider a shoulder-stability check or using z-depth.
-            "bicep_curl" -> ExerciseConfig(
+            BICEP_CURL_ID -> ExerciseConfig(
                 rightP1Idx        = LANDMARK_RIGHT_WRIST,
                 rightVertexIdx    = LANDMARK_RIGHT_ELBOW,
                 rightP2Idx        = LANDMARK_RIGHT_SHOULDER,
@@ -378,6 +428,9 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 s1Angle           = BICEP_CURL_S1_ANGLE,
                 s3Angle           = BICEP_CURL_S3_ANGLE,
                 s3HasLarger       = false,
+                s1ExitAngle        = BICEP_CURL_MOVE_ENTER_ANGLE,
+                s3ExitAngle        = BICEP_CURL_TOP_LEAVE_ANGLE,
+                cooldownFrames     = BICEP_CURL_COOLDOWN_FRAMES,
                 isBilateral       = false,
             )
 
