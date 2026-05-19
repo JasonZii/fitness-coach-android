@@ -19,18 +19,18 @@ class AlignOeDtwTest {
     // ── helpers ──────────────────────────────────────────────────────────────
 
     /** Build a single normalised frame with [landmarks] landmarks, all at [x],[y]. */
-    private fun uniformFrame(x: Float, y: Float, landmarks: Int = 33): List<Pair<Float, Float>> =
-        List(landmarks) { Pair(x, y) }
+    private fun uniformFrame(x: Float, y: Float, landmarks: Int = 33): List<Triple<Float, Float, Float>> =
+        List(landmarks) { Triple(x, y, 0f) }
 
     /**
      * Build a reference sequence of [length] frames.
      * Each frame has 33 landmarks. The joint positions vary per frame so that
      * consecutive frames are distinguishable and the DTW alignment is non-trivial.
      */
-    private fun buildSequence(length: Int, seed: Long = 42L): List<List<Pair<Float, Float>>> {
+    private fun buildSequence(length: Int, seed: Long = 42L): List<List<Triple<Float, Float, Float>>> {
         val rng = Random(seed)
         return List(length) {
-            List(33) { Pair(rng.nextFloat(), rng.nextFloat()) }
+            List(33) { Triple(rng.nextFloat(), rng.nextFloat(), 0f) }
         }
     }
 
@@ -130,23 +130,23 @@ class AlignOeDtwTest {
 
     @Test
     fun frameDistIsZeroForIdenticalFrames() {
-        val frame = List(33) { Pair(0.5f, 0.5f) }
+        val frame = List(33) { Triple(0.5f, 0.5f, 0f) }
         val d = frameDist(frame, frame)
         assertTrue("frameDist of identical frames must be 0, got $d", abs(d) < 1e-6f)
     }
 
     @Test
     fun frameDistIsPositiveForDifferentFrames() {
-        val a = List(33) { Pair(0.0f, 0.0f) }
-        val b = List(33) { Pair(1.0f, 1.0f) }
+        val a = List(33) { Triple(0.0f, 0.0f, 0f) }
+        val b = List(33) { Triple(1.0f, 1.0f, 0f) }
         val d = frameDist(a, b)
         assertTrue("frameDist of different frames must be > 0, got $d", d > 0f)
     }
 
     @Test
     fun frameDistIsSymmetric() {
-        val a = List(33) { i -> Pair(i * 0.01f, i * 0.02f) }
-        val b = List(33) { i -> Pair(i * 0.03f, i * 0.01f) }
+        val a = List(33) { i -> Triple(i * 0.01f, i * 0.02f, 0f) }
+        val b = List(33) { i -> Triple(i * 0.03f, i * 0.01f, 0f) }
         val dAB = frameDist(a, b)
         val dBA = frameDist(b, a)
         assertEquals("frameDist must be symmetric", dAB, dBA, 1e-6f)

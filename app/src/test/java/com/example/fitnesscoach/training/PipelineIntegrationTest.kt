@@ -36,7 +36,7 @@ class PipelineIntegrationTest {
         val referenceSequence = rawFrames.map { normalizeLandmarks(it) }
 
         val evaluateUseCase  = EvaluateExerciseUseCase()
-        val userSequence     = mutableListOf<List<Pair<Float, Float>>>()
+        val userSequence     = mutableListOf<List<Triple<Float, Float, Float>>>()
 
         println("%-6s  %-14s  %s".format("frame", "matchedIdx", "sf"))
         println("-".repeat(36))
