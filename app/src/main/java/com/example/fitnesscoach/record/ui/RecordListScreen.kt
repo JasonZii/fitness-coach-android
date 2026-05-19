@@ -50,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import androidx.room.Room
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
@@ -62,15 +61,10 @@ import java.util.Locale
 fun RecordListScreen(navController: NavHostController) {
     val context = LocalContext.current
 
-    val database = remember {
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "fitnesscoach_db"
-        ).build()
+    val dao = remember(context) {
+        AppDatabase.getInstance(context).trainingRecordDao()
     }
 
-    val dao = database.trainingRecordDao()
     val records by dao.getAllRecords().collectAsState(initial = emptyList())
     var searchText by remember { mutableStateOf("") }
 
