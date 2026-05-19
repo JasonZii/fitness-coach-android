@@ -8,12 +8,21 @@ import androidx.lifecycle.viewModelScope
 import com.example.fitnesscoach.core.mediapipe.PoseResult
 import com.example.fitnesscoach.exercise.data.exerciseList
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ANKLE
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_KNEE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_WRIST
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_ANKLE
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_KNEE
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_WRIST
 import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
 import com.example.fitnesscoach.core.util.Constants.MAX_CONSECUTIVE_RED_FRAMES
+import com.example.fitnesscoach.core.util.Constants.VISIBILITY_IN_FRAME_MIN
 import kotlin.math.sqrt
 import com.example.fitnesscoach.training.core.RepScoreTracker
 import com.example.fitnesscoach.training.domain.CountRepsUseCase
@@ -57,12 +66,14 @@ private const val CAMERA_DIRECTION_WARNING_GRACE_MS = 1500L
 
 // OE-DTW 滑动窗口：限制 userSequence 长度，避免计算量随时间线性增长
 private const val MAX_USER_SEQUENCE_FRAMES = 18
+private const val DTW_EVERY_N_FRAMES = 2
 // stabiliseMatchedReferenceIndex() 本地搜索范围
 private const val REFERENCE_SEARCH_BACK_FRAMES = 4
 private const val REFERENCE_SEARCH_FORWARD_FRAMES = 10
 // stabiliseMatchedReferenceIndex() 最终夹紧范围
 private const val MAX_REFERENCE_BACKTRACK_FRAMES = 2
 private const val MAX_REFERENCE_FORWARD_JUMP_FRAMES = 6
+private const val BODY_LENGTH_EMA_ALPHA = 0.15f
 
 // 朝向调试日志开关，正式使用时保持 false
 private const val ENABLE_DIRECTION_DEBUG_LOG = false
@@ -176,7 +187,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     private var wasTrainingPaused = false                    // 上一帧是否暂停，用于检测"刚进入暂停的第一帧"
     private var cameraDirectionMismatchSinceMs: Long? = null // 朝向不匹配开始时间戳（null = 当前无不匹配）
-    private var lastMatchedReferenceIndex = -1               // 上一帧 DTW 匹配索引，用于 stabilise 平滑
+    @Volatile private var lastMatchedReferenceIndex = -1     // 上一帧 DTW 匹配索引，用于 stabilise 平滑
+    private var dtwFrameCounter = 0                          // 控制完整 DTW 频率；中间帧走局部搜索
+    private val smoothedSegmentLengths = mutableMapOf<Pair<Int, Int>, Float>()
 
     // ══════════════════════════════════════════════════════════════════════════
     // A5：参考序列数据
@@ -243,9 +256,13 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             endDetector.reset()
             repScoreTracker.reset()
             userSequence.clear()
+            synchronized(smoothedSegmentLengths) {
+                smoothedSegmentLengths.clear()
+            }
             countRepsUseCase               = CountRepsUseCase(info.id)
             wasTrainingPaused              = false
             lastMatchedReferenceIndex      = -1
+            dtwFrameCounter                = 0
             cameraDirectionMismatchSinceMs = null
         }
 
@@ -314,6 +331,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // 快速路径：原子写入，Compose 立刻感知，骨架位置零延迟更新
         _skeletonFlow.value = poseResult.landmarks
+        updateReferenceSkeletonForCurrentBody(poseResult)
 
         // 慢速路径：所有算法计算在专用后台线程，不阻塞相机帧采集
         if (!isAlgorithmFrameInFlight.compareAndSet(false, true)) return
@@ -353,9 +371,13 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             endDetector.reset()
             repScoreTracker.reset()
             userSequence.clear()
+            synchronized(smoothedSegmentLengths) {
+                smoothedSegmentLengths.clear()
+            }
             countRepsUseCase.reset()
             wasTrainingPaused              = false
             lastMatchedReferenceIndex      = -1
+            dtwFrameCounter                = 0
             cameraDirectionMismatchSinceMs = null
         }
     }
@@ -515,6 +537,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             userSequence.clear()
             countRepsUseCase.reset()
             lastMatchedReferenceIndex = -1
+            dtwFrameCounter = 0
         }
         wasTrainingPaused = isPaused
 
@@ -563,9 +586,16 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             userSequence.removeAt(0)
         }
 
-        // ── Module 2：OE-DTW 对齐 + 平滑 [D3] ──────────────────────────────────
-        val dtwMatchedIdx = alignOeDtw(userSequence, referenceSequence)
-        val matchedIdx    = stabiliseMatchedReferenceIndex(dtwMatchedIdx, normalized)
+        // ── Module 2：OE-DTW 对齐 + 轻量局部跟踪 [D3] ───────────────────────────
+        val shouldRunFullDtw =
+            lastMatchedReferenceIndex == -1 ||
+                dtwFrameCounter++ % DTW_EVERY_N_FRAMES == 0
+        val matchedIdx = if (shouldRunFullDtw) {
+            val dtwMatchedIdx = alignOeDtw(userSequence, referenceSequence)
+            stabiliseMatchedReferenceIndex(dtwMatchedIdx, normalized)
+        } else {
+            trackReferenceIndexLocally(normalized)
+        }
 
         // ── Module 3：姿态评分 + 红绿颜色 ───────────────────────────────────────
         val scoreResult = evaluateUseCase.evaluate(
@@ -593,6 +623,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             repScoreTracker.finishRep()
             userSequence.clear()        // Rep 完成后清空，让 DTW 重新定位到参考序列起点
             lastMatchedReferenceIndex = -1
+            dtwFrameCounter = 0
             repScoreTracker.getCompletedRepScores()
         } else {
             _uiState.value.repScores
@@ -601,7 +632,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // ── 蓝色参考骨架坐标 [D4] ────────────────────────────────────────────────
         // DTW 热身完成（matchedIdx != -1）后才显示，坐标重新定位到用户身体位置
         val matchedRaw = if (matchedIdx != -1)
-            repositionReference(rawReferenceSequence[matchedIdx], poseResult.landmarks)
+            repositionReference(rawReferenceSequence[matchedIdx], poseResult.landmarks, poseResult.visibilities)
         else emptyList()
         poseFrameProcessor.updateReferenceSkeleton(matchedRaw)
 
@@ -639,6 +670,25 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // D0：updateReferenceSkeletonForCurrentBody()
+    // 调用方：onFrame() 快速路径
+    // 作用：完整 DTW 尚未跑完时，也用上一匹配参考帧 + 当前身体坐标即时重定位蓝骨架
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun updateReferenceSkeletonForCurrentBody(poseResult: PoseResult) {
+        val state = _uiState.value
+        if (state.phase != SessionPhase.TRAINING || state.isTrainingPaused) return
+
+        val idx = lastMatchedReferenceIndex
+        val rawSeq = rawReferenceSequence
+        if (idx !in rawSeq.indices) return
+
+        poseFrameProcessor.updateReferenceSkeleton(
+            repositionReference(rawSeq[idx], poseResult.landmarks, poseResult.visibilities)
+        )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // D2：updateCameraDirectionWarning()
     // 调用方：processTrainingFrame() [D1]
     // 作用：判断朝向不匹配是否已持续超过 1500ms 宽限期
@@ -654,6 +704,35 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             cameraDirectionMismatchSinceMs = it
         }
         return nowMs - mismatchSince >= CAMERA_DIRECTION_WARNING_GRACE_MS
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // D2.5：trackReferenceIndexLocally()
+    // 调用方：processTrainingFrame() [D1]，完整 DTW 间隔帧
+    // 作用：只在上一匹配帧附近用 frameDist 轻量搜索，降低每帧 DTW 成本
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private fun trackReferenceIndexLocally(
+        currentNormalized: List<Triple<Float, Float, Float>>,
+    ): Int {
+        val lastIdx = lastMatchedReferenceIndex
+        if (lastIdx == -1 || referenceSequence.isEmpty()) return -1
+
+        val searchStart = maxOf(0, lastIdx - REFERENCE_SEARCH_BACK_FRAMES)
+        val searchEnd = minOf(
+            referenceSequence.lastIndex,
+            lastIdx + REFERENCE_SEARCH_FORWARD_FRAMES
+        )
+        val localBestIdx = (searchStart..searchEnd).minByOrNull { idx ->
+            frameDist(currentNormalized, referenceSequence[idx])
+        } ?: lastIdx
+
+        val smoothed = localBestIdx.coerceIn(
+            minimumValue = maxOf(0, lastIdx - MAX_REFERENCE_BACKTRACK_FRAMES),
+            maximumValue = minOf(referenceSequence.lastIndex, lastIdx + MAX_REFERENCE_FORWARD_JUMP_FRAMES)
+        )
+        lastMatchedReferenceIndex = smoothed
+        return smoothed
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -713,32 +792,37 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     private fun repositionReference(
         refRaw: List<Triple<Float, Float, Float>>,
         userRaw: List<Triple<Float, Float, Float>>,
+        userVisibilities: List<Float>,
     ): List<Triple<Float, Float, Float>> {
         val normalizedRef = normalizeLandmarks(refRaw)
 
-        val userHipMidX      = (userRaw[LANDMARK_LEFT_HIP].first      + userRaw[LANDMARK_RIGHT_HIP].first)      / 2f
-        val userHipMidY      = (userRaw[LANDMARK_LEFT_HIP].second     + userRaw[LANDMARK_RIGHT_HIP].second)     / 2f
-        val userShoulderMidX = (userRaw[LANDMARK_LEFT_SHOULDER].first  + userRaw[LANDMARK_RIGHT_SHOULDER].first)  / 2f
-        val userShoulderMidY = (userRaw[LANDMARK_LEFT_SHOULDER].second + userRaw[LANDMARK_RIGHT_SHOULDER].second) / 2f
-        val refShoulderMidX  =
-            (normalizedRef[LANDMARK_LEFT_SHOULDER].first  + normalizedRef[LANDMARK_RIGHT_SHOULDER].first)  / 2f
-        val refShoulderMidY  =
+        val userHipMidX =
+            (userRaw[LANDMARK_LEFT_HIP].first + userRaw[LANDMARK_RIGHT_HIP].first) / 2f
+        val userHipMidY =
+            (userRaw[LANDMARK_LEFT_HIP].second + userRaw[LANDMARK_RIGHT_HIP].second) / 2f
+        val userShoulderMidX =
+            (userRaw[LANDMARK_LEFT_SHOULDER].first + userRaw[LANDMARK_RIGHT_SHOULDER].first) / 2f
+        val userShoulderMidY =
+            (userRaw[LANDMARK_LEFT_SHOULDER].second + userRaw[LANDMARK_RIGHT_SHOULDER].second) / 2f
+        val refShoulderMidX =
+            (normalizedRef[LANDMARK_LEFT_SHOULDER].first + normalizedRef[LANDMARK_RIGHT_SHOULDER].first) / 2f
+        val refShoulderMidY =
             (normalizedRef[LANDMARK_LEFT_SHOULDER].second + normalizedRef[LANDMARK_RIGHT_SHOULDER].second) / 2f
 
         val userTorsoLen = sqrt(
             (userShoulderMidX - userHipMidX) * (userShoulderMidX - userHipMidX) +
-            (userShoulderMidY - userHipMidY) * (userShoulderMidY - userHipMidY)
+                    (userShoulderMidY - userHipMidY) * (userShoulderMidY - userHipMidY)
         )
         val refTorsoLen = sqrt(
             refShoulderMidX * refShoulderMidX +
-            refShoulderMidY * refShoulderMidY
+                    refShoulderMidY * refShoulderMidY
         )
 
         // 躯干长度接近零时（极端异常），直接返回原始坐标避免除以零
         if (userTorsoLen < 1e-6f || refTorsoLen < 1e-6f) return refRaw
 
-        val refUnitX  = refShoulderMidX / refTorsoLen
-        val refUnitY  = refShoulderMidY / refTorsoLen
+        val refUnitX = refShoulderMidX / refTorsoLen
+        val refUnitY = refShoulderMidY / refTorsoLen
         val userUnitX = (userShoulderMidX - userHipMidX) / userTorsoLen
         val userUnitY = (userShoulderMidY - userHipMidY) / userTorsoLen
         val cos = refUnitX * userUnitX + refUnitY * userUnitY
@@ -760,15 +844,48 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             return sqrt(dx * dx + dy * dy)
         }
 
+        fun segmentLength(parentIdx: Int, childIdx: Int): Float {
+            val current = distance(userRaw[parentIdx], userRaw[childIdx])
+            val key = parentIdx to childIdx
+            val visible =
+                userVisibilities.getOrElse(parentIdx) { 0f } >= VISIBILITY_IN_FRAME_MIN &&
+                    userVisibilities.getOrElse(childIdx) { 0f } >= VISIBILITY_IN_FRAME_MIN
+
+            return synchronized(smoothedSegmentLengths) {
+                val cached = smoothedSegmentLengths[key]
+
+                if (!visible || current < 1e-6f) return@synchronized cached ?: current
+
+                val smoothed = if (cached == null) {
+                    current
+                } else {
+                    cached * (1f - BODY_LENGTH_EMA_ALPHA) + current * BODY_LENGTH_EMA_ALPHA
+                }
+                smoothedSegmentLengths[key] = smoothed
+                smoothed
+            }
+        }
+
+        fun rotatedReferenceDirection(parentIdx: Int, childIdx: Int): Pair<Float, Float>? {
+            val refParent = normalizedRef[parentIdx]
+            val refChild = normalizedRef[childIdx]
+            val dx = refChild.first - refParent.first
+            val dy = refChild.second - refParent.second
+            val rotatedX = dx * cos - dy * sin
+            val rotatedY = dx * sin + dy * cos
+            val length = sqrt(rotatedX * rotatedX + rotatedY * rotatedY)
+            if (length < 1e-6f) return null
+            return rotatedX / length to rotatedY / length
+        }
+
         fun retargetSegment(parentIdx: Int, childIdx: Int) {
             val parent = transformed[parentIdx]
-            val currentChild = transformed[childIdx]
-            val refLength = distance(parent, currentChild)
-            val userLength = distance(userRaw[parentIdx], userRaw[childIdx])
-            if (refLength < 1e-6f || userLength < 1e-6f) return
+            val direction = rotatedReferenceDirection(parentIdx, childIdx) ?: return
+            val userLength = segmentLength(parentIdx, childIdx)
+            if (userLength < 1e-6f) return
 
-            val ux = (currentChild.first - parent.first) / refLength
-            val uy = (currentChild.second - parent.second) / refLength
+            val ux = direction.first
+            val uy = direction.second
             transformed[childIdx] = Triple(
                 parent.first + ux * userLength,
                 parent.second + uy * userLength,
@@ -785,12 +902,13 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         // Use the user's current body proportions while keeping the matched
         // reference frame's limb directions. This keeps distal joints attached
         // to the live body instead of drifting with the reference actor's proportions.
-        retargetChain(11, 13, 15) // left arm: shoulder -> elbow -> wrist
-        retargetChain(12, 14, 16) // right arm
-        retargetChain(23, 25, 27) // left leg: hip -> knee -> ankle
-        retargetChain(24, 26, 28) // right leg
+        retargetChain(LANDMARK_LEFT_SHOULDER, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_WRIST)
+        retargetChain(LANDMARK_RIGHT_SHOULDER, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_WRIST)
+        retargetChain(LANDMARK_LEFT_HIP, LANDMARK_LEFT_KNEE, LANDMARK_LEFT_ANKLE)
+        retargetChain(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE)
 
         return transformed
+
     }
 
     // ══════════════════════════════════════════════════════════════════════════
