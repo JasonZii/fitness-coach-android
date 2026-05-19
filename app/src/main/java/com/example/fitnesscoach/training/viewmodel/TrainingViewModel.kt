@@ -203,7 +203,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     // ══════════════════════════════════════════════════════════════════════════
 
     private var referenceFrameIndex = 0
-    private var referenceJob: Job? = null
+//    private var referenceJob: Job? = null
     private var referenceFrames: List<List<Triple<Float, Float, Float>>> = emptyList()
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -334,7 +334,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
      * away before state is wiped.
      */
     fun stopTraining() {
-        stopDynamicReferenceSkeleton()
+//        stopDynamicReferenceSkeleton()
         _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
         _skeletonFlow.value = emptyList()
 
@@ -548,9 +548,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val normalized = normalizeLandmarks(poseResult.landmarks)
         userSequence.add(normalized)
         // 滑动窗口：保持 DTW 计算量为 O(MAX_USER_SEQUENCE_FRAMES × 参考序列长度)
-        if (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
-            userSequence.removeAt(0)
-        }
+//        if (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
+//            userSequence.removeAt(0)
+//        }
 
         // ── Module 2：OE-DTW 对齐 + 平滑 [D3] ──────────────────────────────────
         val dtwMatchedIdx = alignOeDtw(userSequence, referenceSequence)
@@ -753,23 +753,23 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     // 相关字段：referenceFrameIndex、referenceJob、referenceFrames（见 A7）
     // ══════════════════════════════════════════════════════════════════════════
 
-    private fun startDynamicReferenceSkeleton() {
-        referenceJob?.cancel()
-        referenceJob = viewModelScope.launch {
-            while (true) {
-                if (referenceFrames.isNotEmpty()) {
-                    referenceFrameIndex = (referenceFrameIndex + 1) % referenceFrames.size
-                    _uiState.value = _uiState.value.copy(
-                        dynamicReferenceLandmarks = referenceFrames[referenceFrameIndex]
-                    )
-                }
-                delay(100L)
-            }
-        }
-    }
+//    private fun startDynamicReferenceSkeleton() {
+//        referenceJob?.cancel()
+//        referenceJob = viewModelScope.launch {
+//            while (true) {
+//                if (referenceFrames.isNotEmpty()) {
+//                    referenceFrameIndex = (referenceFrameIndex + 1) % referenceFrames.size
+//                    _uiState.value = _uiState.value.copy(
+//                        dynamicReferenceLandmarks = referenceFrames[referenceFrameIndex]
+//                    )
+//                }
+//                delay(100L)
+//            }
+//        }
+//    }
 
-    private fun stopDynamicReferenceSkeleton() {
-        referenceJob?.cancel()
-        referenceJob = null
-    }
+//    private fun stopDynamicReferenceSkeleton() {
+//        referenceJob?.cancel()
+//        referenceJob = null
+//    }
 }
