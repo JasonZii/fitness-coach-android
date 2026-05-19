@@ -45,6 +45,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import com.example.fitnesscoach.training.pose.PoseFrameProcessor
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -156,6 +157,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
     // 单线程执行器：所有算法计算在此串行执行，不阻塞主线程或相机线程
     private val algorithmDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+    private val isAlgorithmFrameInFlight = AtomicBoolean(false)
 
     // ══════════════════════════════════════════════════════════════════════════
     // A3：算法模块实例（生命周期与 ViewModel 一致）
@@ -233,6 +235,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             isReferenceLoaded   = false,
         )
         _skeletonFlow.value = emptyList()
+        poseFrameProcessor.updateReferenceSkeleton(emptyList())
 
         // 在 algorithmDispatcher 上重置，保证与飞行中的帧处理协程串行执行
         viewModelScope.launch(algorithmDispatcher) {
@@ -292,6 +295,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                         nowMs = System.currentTimeMillis(),
                     )
                     _skeletonFlow.value = emptyList()
+                    poseFrameProcessor.updateReferenceSkeleton(emptyList())
                     _uiState.update { state ->
                         state.copy(
                             isFullBodyInFrame = false,
@@ -312,11 +316,16 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         _skeletonFlow.value = poseResult.landmarks
 
         // 慢速路径：所有算法计算在专用后台线程，不阻塞相机帧采集
+        if (!isAlgorithmFrameInFlight.compareAndSet(false, true)) return
         viewModelScope.launch(algorithmDispatcher) {
-            when (_uiState.value.phase) {
-                SessionPhase.READINESS -> processReadinessFrame(poseResult)
-                SessionPhase.TRAINING  -> processTrainingFrame(poseResult)
-                SessionPhase.FINISHED  -> Unit
+            try {
+                when (_uiState.value.phase) {
+                    SessionPhase.READINESS -> processReadinessFrame(poseResult)
+                    SessionPhase.TRAINING  -> processTrainingFrame(poseResult)
+                    SessionPhase.FINISHED  -> Unit
+                }
+            } finally {
+                isAlgorithmFrameInFlight.set(false)
             }
         }
     }
@@ -337,6 +346,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 //        stopDynamicReferenceSkeleton()
         _uiState.update { it.copy(phase = SessionPhase.FINISHED) }
         _skeletonFlow.value = emptyList()
+        poseFrameProcessor.updateReferenceSkeleton(emptyList())
 
         viewModelScope.launch(algorithmDispatcher) {
             readinessMachine.reset()
@@ -444,6 +454,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 jointArgbColors = IntArray(LANDMARK_COUNT) { android.graphics.Color.GREEN },
                 limbArgbColors = IntArray(LIMB_COUNT) { android.graphics.Color.GREEN },
             )
+            poseFrameProcessor.updateReferenceSkeleton(emptyList())
         }
 
         val angle = detectCameraAngle(poseResult.landmarks)
@@ -548,9 +559,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val normalized = normalizeLandmarks(poseResult.landmarks)
         userSequence.add(normalized)
         // 滑动窗口：保持 DTW 计算量为 O(MAX_USER_SEQUENCE_FRAMES × 参考序列长度)
-//        if (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
-//            userSequence.removeAt(0)
-//        }
+        while (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
+            userSequence.removeAt(0)
+        }
 
         // ── Module 2：OE-DTW 对齐 + 平滑 [D3] ──────────────────────────────────
         val dtwMatchedIdx = alignOeDtw(userSequence, referenceSequence)
@@ -592,6 +603,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val matchedRaw = if (matchedIdx != -1)
             repositionReference(rawReferenceSequence[matchedIdx], poseResult.landmarks)
         else emptyList()
+        poseFrameProcessor.updateReferenceSkeleton(matchedRaw)
 
         // ── 把本帧评分颜色推给 PoseFrameProcessor，供下一帧绘制骨架时使用 ──────────
         // 颜色在下一帧生效（一帧延迟），这是避免阻塞相机线程的刻意设计
@@ -732,7 +744,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val cos = refUnitX * userUnitX + refUnitY * userUnitY
         val sin = refUnitX * userUnitY - refUnitY * userUnitX
 
-        return normalizedRef.map { (nx, ny, _) ->
+        val transformed = normalizedRef.map { (nx, ny, _) ->
             val rotatedX = nx * cos - ny * sin
             val rotatedY = nx * sin + ny * cos
             Triple(
@@ -740,7 +752,45 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
                 rotatedY * userTorsoLen + userHipMidY,
                 0f,
             )
+        }.toMutableList()
+
+        fun distance(a: Triple<Float, Float, Float>, b: Triple<Float, Float, Float>): Float {
+            val dx = a.first - b.first
+            val dy = a.second - b.second
+            return sqrt(dx * dx + dy * dy)
         }
+
+        fun retargetSegment(parentIdx: Int, childIdx: Int) {
+            val parent = transformed[parentIdx]
+            val currentChild = transformed[childIdx]
+            val refLength = distance(parent, currentChild)
+            val userLength = distance(userRaw[parentIdx], userRaw[childIdx])
+            if (refLength < 1e-6f || userLength < 1e-6f) return
+
+            val ux = (currentChild.first - parent.first) / refLength
+            val uy = (currentChild.second - parent.second) / refLength
+            transformed[childIdx] = Triple(
+                parent.first + ux * userLength,
+                parent.second + uy * userLength,
+                0f,
+            )
+        }
+
+        fun retargetChain(rootIdx: Int, midIdx: Int, endIdx: Int) {
+            transformed[rootIdx] = userRaw[rootIdx]
+            retargetSegment(rootIdx, midIdx)
+            retargetSegment(midIdx, endIdx)
+        }
+
+        // Use the user's current body proportions while keeping the matched
+        // reference frame's limb directions. This keeps distal joints attached
+        // to the live body instead of drifting with the reference actor's proportions.
+        retargetChain(11, 13, 15) // left arm: shoulder -> elbow -> wrist
+        retargetChain(12, 14, 16) // right arm
+        retargetChain(23, 25, 27) // left leg: hip -> knee -> ankle
+        retargetChain(24, 26, 28) // right leg
+
+        return transformed
     }
 
     // ══════════════════════════════════════════════════════════════════════════
