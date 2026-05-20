@@ -59,7 +59,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `after onTrainingStart with normal conditions returns ACTIVE`() {
-        detector.onTrainingStart(landmarks(shoulderWidthPx = 0.1f))
+        detector.onTrainingStart(landmarks(shoulderWidthPx = 0.1f), CameraAngle.FRONT)
         val result = detector.update(landmarks(0.1f), visibilities(), nowMs = 1_000L)
         assertEquals(TrainingPauseState.ACTIVE, result)
     }
@@ -69,7 +69,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `shoulder width exactly at threshold returns ACTIVE`() {
         val baseline = 0.1f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
         // width == baseline * ratio → not strictly greater → ACTIVE
         val currentWidth = baseline * END_SHOULDER_WIDTH_RATIO
         val result = detector.update(landmarks(currentWidth), visibilities(), nowMs = 1_000L)
@@ -79,7 +79,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `shoulder width just above threshold fires immediately (PAUSED)`() {
         val baseline = 0.1f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
         // Slightly above ratio threshold → immediate PAUSED, no hold period
         val tooWide = baseline * END_SHOULDER_WIDTH_RATIO + 0.001f
         val result = detector.update(landmarks(tooWide), visibilities(), nowMs = 1_000L)
@@ -89,7 +89,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `shoulder width pause recovers when width drops back below threshold`() {
         val baseline = 0.1f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
 
         val tooWide = baseline * END_SHOULDER_WIDTH_RATIO + 0.01f
         // First frame: paused
@@ -103,7 +103,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `double baseline shoulder width triggers pause`() {
         val baseline = 0.2f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
         // 2× baseline is > 1.5× baseline
         val result = detector.update(landmarks(baseline * 2f), visibilities(), nowMs = 500L)
         assertEquals(TrainingPauseState.PAUSED, result)
@@ -119,7 +119,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `low visibility does not pause before hold period elapses`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val vis = visibilities(overrides = lowVisOverrides(END_VISIBILITY_THRESHOLD - 0.01f))
 
         // Still within hold window
@@ -130,7 +130,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `low visibility pauses exactly at hold period boundary`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val vis = visibilities(overrides = lowVisOverrides(0f))
 
         // t=0: starts the timer
@@ -143,7 +143,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `visibility above threshold keeps state ACTIVE`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val vis = visibilities(defaultVis = END_VISIBILITY_THRESHOLD + 0.1f)
         val result = detector.update(landmarks(), vis, nowMs = 10_000L)
         assertEquals(TrainingPauseState.ACTIVE, result)
@@ -151,7 +151,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `visibility recovery resets hold timer (ACTIVE again before re-pausing)`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val lowVis  = visibilities(overrides = lowVisOverrides(0f))
         val goodVis = visibilities(defaultVis = 0.9f)
 
@@ -175,7 +175,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `visibility pause recovers once visibility returns above threshold`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val lowVis  = visibilities(overrides = lowVisOverrides(0f))
         val goodVis = visibilities(defaultVis = 0.9f)
 
@@ -197,7 +197,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `reset clears baseline so shoulder-width check is disabled`() {
         val baseline = 0.1f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
         detector.reset()
 
         // Without a baseline, too-close check should not fire
@@ -208,7 +208,7 @@ class TrainingEndDetectorTest {
 
     @Test
     fun `reset clears visibility timer so 3 s hold starts fresh`() {
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         val lowVis = visibilities(overrides = lowVisOverrides(0f))
 
         // Run for 2.5 s below threshold
@@ -218,7 +218,7 @@ class TrainingEndDetectorTest {
         detector.reset()
 
         // Re-initialise and drop visibility; clock starts over
-        detector.onTrainingStart(landmarks())
+        detector.onTrainingStart(landmarks(), CameraAngle.FRONT)
         detector.update(landmarks(), lowVis, nowMs = 0L)
         // Only 1 s elapsed since reset — not yet at 3 s hold
         val result = detector.update(landmarks(), lowVis, nowMs = 1_000L)
@@ -230,7 +230,7 @@ class TrainingEndDetectorTest {
     @Test
     fun `both conditions active returns PAUSED`() {
         val baseline = 0.1f
-        detector.onTrainingStart(landmarks(baseline))
+        detector.onTrainingStart(landmarks(baseline), CameraAngle.FRONT)
 
         val tooWide = baseline * END_SHOULDER_WIDTH_RATIO + 0.01f
         val lowVis  = visibilities(overrides = lowVisOverrides(0f))

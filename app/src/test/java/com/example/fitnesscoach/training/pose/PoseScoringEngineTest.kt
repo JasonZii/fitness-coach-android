@@ -97,16 +97,20 @@ class PoseScoringEngineTest {
     }
 
     @Test
-    fun calculatePoseScore_shiftedJoint_affectedJointColorIsRed() {
-        val ref = uniformLandmarks()
+    fun calculatePoseScore_reversedConnectedLimb_affectedJointColorIsRed() {
+        val ref = uniformLandmarks().toMutableList()
         val user = uniformLandmarks().toMutableList()
-        user[0] = Pair(0.9f, 0.9f)
+
+        ref[11] = Pair(0.3f, 0.5f)
+        ref[13] = Pair(0.7f, 0.5f)
+        user[11] = Pair(0.3f, 0.5f)
+        user[13] = Pair(0.0f, 0.5f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         assertEquals(
-            "jointColors[0] must be RED when Sp < $SCORE_RED_THRESHOLD",
+            "jointColors[11] must be RED when a connected limb score is below $SCORE_RED_THRESHOLD",
             Color.Red,
-            result.jointColors[0]
+            result.jointColors[11]
         )
     }
 

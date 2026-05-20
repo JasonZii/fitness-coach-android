@@ -20,14 +20,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
-import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
 import com.example.fitnesscoach.training.pose.CameraAngle
 import com.example.fitnesscoach.training.pose.ReadinessPhase
 import com.example.fitnesscoach.training.viewmodel.SessionPhase
 import com.example.fitnesscoach.training.viewmodel.TrainingUiState
 import com.example.fitnesscoach.training.viewmodel.TrainingViewModel
-import androidx.room.Room
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.fitnesscoach.data.local.AppDatabase
@@ -44,22 +41,10 @@ fun TrainingScreen(
     val context = LocalContext.current
     val viewModel: TrainingViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
-    val blueJointColors = remember {
-        List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) }
-    }
-
-    val blueLimbColors = remember {
-        List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) }
-    }
     var showReferenceSkeleton by remember { mutableStateOf(true) }
-    val database = remember {
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "fitnesscoach_db"
-        ).build()
+    val dao = remember(context) {
+        AppDatabase.getInstance(context).trainingRecordDao()
     }
-    val dao = database.trainingRecordDao()
     val scope = rememberCoroutineScope()
 
     // ── Camera permission ────────────────────────────────────────────────────
@@ -84,6 +69,10 @@ fun TrainingScreen(
         viewModel.loadExercise(exerciseId)
     }
 
+    LaunchedEffect(showReferenceSkeleton) {
+        viewModel.poseFrameProcessor.setReferenceSkeletonVisible(showReferenceSkeleton)
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
 
         // ── Layer 1: composited camera frame (camera image + skeleton drawn on bitmap) ──
@@ -95,35 +84,6 @@ fun TrainingScreen(
                 context        = context,
                 frameProcessor = viewModel.poseFrameProcessor,
                 onPoseDetected = { poseResult -> viewModel.onFrame(poseResult) }
-            )
-        }
-
-        // ── Layer 3: reference skeleton (blue, semi-transparent) ─────
-        // Shown only when at least one joint is red (posture needs correction).
-//        if (uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT) {
-//            SkeletonOverlay(
-//                landmarks   = uiState.matchedReferenceRawLandmarks,
-//                jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-//                limbColors  = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-//                modifier    = Modifier.fillMaxSize()
-//            )
-//        }
-
-        if (
-            showReferenceSkeleton &&
-            uiState.phase == SessionPhase.TRAINING &&
-            !uiState.isTrainingPaused &&
-            uiState.matchedReferenceRawLandmarks.size == LANDMARK_COUNT
-        ) {
-            SkeletonOverlay(
-                landmarks = uiState.matchedReferenceRawLandmarks,
-//                jointColors = List(LANDMARK_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-//                limbColors = List(LIMB_COUNT) { Color.Blue.copy(alpha = 0.55f) },
-                jointColors = blueJointColors,
-                limbColors = blueLimbColors,
-                sourceWidth = uiState.cameraFrameWidth,
-                sourceHeight = uiState.cameraFrameHeight,
-                modifier = Modifier.fillMaxSize()
             )
         }
 

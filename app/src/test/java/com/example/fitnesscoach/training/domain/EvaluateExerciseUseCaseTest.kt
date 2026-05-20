@@ -25,7 +25,7 @@ class EvaluateExerciseUseCaseTest {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private fun uniformLandmarks(x: Float = 0.5f, y: Float = 0.5f) =
-        List(LANDMARK_COUNT) { Pair(x, y) }
+        List(LANDMARK_COUNT) { Triple(x, y, 0f) }
 
     /** A one-frame reference sequence using uniform landmarks. */
     private fun singleFrameSequence(x: Float = 0.5f, y: Float = 0.5f) =
@@ -103,11 +103,14 @@ class EvaluateExerciseUseCaseTest {
     }
 
     @Test
-    fun evaluate_shiftedJoint_affectedJointIsRed() {
-        val ref = uniformLandmarks()
+    fun evaluate_reversedConnectedLimb_affectedJointIsRed() {
+        val ref = uniformLandmarks().toMutableList()
         val user = uniformLandmarks().toMutableList()
-        // Shift landmark 0 far from reference → Sp < 80 → RED
-        user[0] = Pair(0.9f, 0.9f)
+
+        ref[11] = Triple(0.3f, 0.5f, 0f)
+        ref[13] = Triple(0.7f, 0.5f, 0f)
+        user[11] = Triple(0.3f, 0.5f, 0f)
+        user[13] = Triple(0.0f, 0.5f, 0f)
 
         val result = useCase.evaluate(
             matchedReferenceIndex = 0,
@@ -115,9 +118,9 @@ class EvaluateExerciseUseCaseTest {
             referenceSequence = listOf(ref)
         )
         assertEquals(
-            "jointColors[0] must be RED for significantly shifted landmark",
+            "jointColors[11] must be RED when a connected limb is reversed",
             Color.Red,
-            result.jointColors[0]
+            result.jointColors[11]
         )
     }
 
@@ -125,7 +128,7 @@ class EvaluateExerciseUseCaseTest {
     fun evaluate_shiftedJoint_s1IsReducedFromPerfect() {
         val ref = uniformLandmarks()
         val user = uniformLandmarks().toMutableList()
-        user[0] = Pair(0.9f, 0.9f)
+        user[0] = Triple(0.9f, 0.9f, 0f)
 
         val result = useCase.evaluate(0, user, listOf(ref))
         assertTrue("s1=${result.s1} must be < 100 when one landmark is shifted", result.s1 < 100f)
@@ -135,7 +138,7 @@ class EvaluateExerciseUseCaseTest {
     fun evaluate_validIndex_picksCorrectReferenceFrame() {
         // Reference sequence has two frames: frame 0 is perfect match, frame 1 has shifted landmark 0.
         val lm = uniformLandmarks()
-        val shiftedFrame = uniformLandmarks().toMutableList().also { it[0] = Pair(0.9f, 0.9f) }
+        val shiftedFrame = uniformLandmarks().toMutableList().also { it[0] = Triple(0.9f, 0.9f, 0f) }
         val refSeq = listOf(lm, shiftedFrame)
 
         // When matchedReferenceIndex == 0 (perfect match), sf must be high.

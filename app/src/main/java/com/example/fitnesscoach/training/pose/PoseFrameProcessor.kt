@@ -33,6 +33,7 @@ private val LIMB_PAIRS = listOf(
 private const val VISIBILITY_THRESHOLD = 0.5f
 private const val JOINT_RADIUS_PX = 6f
 private const val LIMB_STROKE_PX  = 3.5f
+private const val REFERENCE_BLUE_ARGB = 0xE80D47A1.toInt()
 
 class PoseFrameProcessor(context: Context) {
 
@@ -47,6 +48,8 @@ class PoseFrameProcessor(context: Context) {
         IntArray(33) { android.graphics.Color.GREEN }
     @Volatile private var latestLimbArgbColors: IntArray =
         IntArray(13) { android.graphics.Color.GREEN }
+    @Volatile private var latestReferenceLandmarks: List<Triple<Float, Float, Float>> = emptyList()
+    @Volatile private var isReferenceSkeletonVisible: Boolean = true
 
     /**
      * Called by TrainingViewModel (on algorithmDispatcher) after each scoring frame.
@@ -55,6 +58,19 @@ class PoseFrameProcessor(context: Context) {
     fun updateColors(jointArgbColors: IntArray, limbArgbColors: IntArray) {
         latestJointArgbColors = jointArgbColors
         latestLimbArgbColors  = limbArgbColors
+    }
+
+    /**
+     * Called by TrainingViewModel after DTW finds the matching reference frame.
+     * The coordinates are already repositioned onto the user's body in normalised
+     * image space, so they can be drawn directly on the next composited bitmap.
+     */
+    fun updateReferenceSkeleton(landmarks: List<Triple<Float, Float, Float>>) {
+        latestReferenceLandmarks = landmarks
+    }
+
+    fun setReferenceSkeletonVisible(visible: Boolean) {
+        isReferenceSkeletonVisible = visible
     }
 
     /**
@@ -113,6 +129,7 @@ class PoseFrameProcessor(context: Context) {
         val visibilities = poseResult.visibilities
         val jointColors  = latestJointArgbColors
         val limbColors   = latestLimbArgbColors
+        val referenceLandmarks = latestReferenceLandmarks
         val w = bitmap.width.toFloat()
         val h = bitmap.height.toFloat()
 
@@ -130,6 +147,29 @@ class PoseFrameProcessor(context: Context) {
         fun vis(idx: Int) = visibilities.getOrElse(idx) { 0f }
         fun px(idx: Int)  = landmarks[idx].first  * w
         fun py(idx: Int)  = landmarks[idx].second * h
+
+        fun refPx(idx: Int) = referenceLandmarks[idx].first * w
+        fun refPy(idx: Int) = referenceLandmarks[idx].second * h
+
+        if (isReferenceSkeletonVisible && referenceLandmarks.size == 33) {
+            limbPaint.color = REFERENCE_BLUE_ARGB
+            LIMB_PAIRS.forEach { (s, e) ->
+                if (s == -1) {
+                    canvas.drawLine(
+                        (refPx(11) + refPx(12)) / 2f, (refPy(11) + refPy(12)) / 2f,
+                        (refPx(23) + refPx(24)) / 2f, (refPy(23) + refPy(24)) / 2f,
+                        limbPaint
+                    )
+                } else {
+                    canvas.drawLine(refPx(s), refPy(s), refPx(e), refPy(e), limbPaint)
+                }
+            }
+
+            jointPaint.color = REFERENCE_BLUE_ARGB
+            DRAWN_JOINT_INDICES.forEach { idx ->
+                canvas.drawCircle(refPx(idx), refPy(idx), JOINT_RADIUS_PX, jointPaint)
+            }
+        }
 
         // Draw limbs first so joints render on top.
         LIMB_PAIRS.forEachIndexed { i, (s, e) ->

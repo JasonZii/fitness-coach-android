@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import androidx.room.Room
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
@@ -38,15 +37,10 @@ fun RecordDetailScreen(
 ) {
     val context = LocalContext.current
 
-    val database = remember {
-        Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "fitnesscoach_db"
-        ).build()
+    val dao = remember(context) {
+        AppDatabase.getInstance(context).trainingRecordDao()
     }
 
-    val dao = database.trainingRecordDao()
     val scope = rememberCoroutineScope()
 
     var record by remember { mutableStateOf<TrainingRecordEntity?>(null) }

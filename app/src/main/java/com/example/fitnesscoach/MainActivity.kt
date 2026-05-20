@@ -23,11 +23,6 @@ import com.example.fitnesscoach.user.viewmodel.UserViewModel
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import com.example.fitnesscoach.data.local.UserPreferencesManager
-import androidx.room.Room
-import com.example.fitnesscoach.data.local.AppDatabase
-import com.example.fitnesscoach.record.data.RecordRepository
-import com.example.fitnesscoach.record.viewmodel.RecordViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)

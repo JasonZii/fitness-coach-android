@@ -18,11 +18,11 @@ import kotlin.math.sqrt
  *  3. x/y/z values are parsed without loss
  *  4. After normalization: hip midpoint == (0,0) within NORMALISE_EPSILON
  *  5. After normalization: torso length == 1.0 within NORMALISE_EPSILON
- *  6. Output has exactly 33 Pair<Float,Float> elements per frame (DRY with NormalizeLandmarksTest)
+ *  6. Output has exactly 33 Triple<Float,Float,Float> elements per frame (DRY with NormalizeLandmarksTest)
  *  7. squat.json: correct total frame count (159)
  *  8. squat.json: every frame has exactly 33 landmarks
  *  9. squat.json: every frame passes normalization invariants
- * 10. squat.json: z values are discarded (output is List<Pair>, not List<Triple>)
+ * 10. squat.json: z values are preserved (output is List<Triple>)
  */
 class ReferencePoseLoaderTest {
 
@@ -60,10 +60,10 @@ class ReferencePoseLoaderTest {
     // ── Test 1: Frame count ───────────────────────────────────────────────────
 
     @Test
-    fun parseReferencePoseJson_threeFrames_returnsThreeFrames() {
+    fun parseReferencePoseJson_threeFrames_defaultDownsampleReturnsTwoFrames() {
         val json = buildMinimalJson(frameCount = 3)
         val result = parseReferencePoseJson(json)
-        assertEquals(3, result.size)
+        assertEquals(2, result.size)
     }
 
     @Test
@@ -163,7 +163,7 @@ class ReferencePoseLoaderTest {
     @Test
     fun squatJson_parse_correctFrameCount() {
         val result = parseReferencePoseJson(loadSquatJson())
-        assertEquals("squat.json should have 159 frames", 159, result.size)
+        assertEquals("squat.json should downsample 159 raw frames to 80 frames", 80, result.size)
     }
 
     @Test
@@ -217,13 +217,13 @@ class ReferencePoseLoaderTest {
     }
 
     @Test
-    fun squatJson_normalize_outputIsListOfPairs_notTriples() {
+    fun squatJson_normalize_outputIsListOfTriples() {
         val frames = parseReferencePoseJson(loadSquatJson())
-        // normalizeLandmarks returns List<Pair<Float,Float>> — z is dropped
+        // normalizeLandmarks returns List<Triple<Float,Float,Float>> and preserves z
         val normalized = normalizeLandmarks(frames[0])
         assertEquals(LANDMARK_COUNT, normalized.size)
-        // Compile-time check: type is Pair, confirming z is discarded
-        val first: Pair<Float, Float> = normalized[0]
-        assertEquals(2, listOf(first.first, first.second).size)
+        // Compile-time check: type is Triple, confirming z is preserved
+        val first: Triple<Float, Float, Float> = normalized[0]
+        assertEquals(3, listOf(first.first, first.second, first.third).size)
     }
 }
