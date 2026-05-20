@@ -22,20 +22,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,18 +47,6 @@ import com.example.fitnesscoach.exercise.data.exerciseList
 
 @Composable
 fun ExerciseLibraryScreen(navController: NavHostController) {
-    var searchQuery by remember { mutableStateOf("") }
-    val filteredExercises = remember(searchQuery) {
-        if (searchQuery.isBlank()) {
-            exerciseList
-        } else {
-            exerciseList.filter { exercise ->
-                exercise.title.contains(searchQuery, ignoreCase = true) ||
-                    exercise.description.contains(searchQuery, ignoreCase = true)
-            }
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -87,21 +68,14 @@ fun ExerciseLibraryScreen(navController: NavHostController) {
             style = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
-
-        ExerciseSearchBar(
-            value = searchQuery,
-            onValueChange = { searchQuery = it }
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             items(
-                items = filteredExercises,
+                items = exerciseList,
                 key = { exercise -> exercise.id }
             ) { exercise ->
                 ExerciseCard(
@@ -117,42 +91,6 @@ fun ExerciseLibraryScreen(navController: NavHostController) {
             }
         }
     }
-}
-
-@Composable
-private fun ExerciseSearchBar(
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = Color(0xFF747681)
-            )
-        },
-        placeholder = {
-            Text(
-                text = "Search exercises",
-                color = Color(0xFF9A9DA8)
-            )
-        },
-        singleLine = true,
-        shape = RoundedCornerShape(18.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
-            focusedBorderColor = Color(0xFF745CFF),
-            unfocusedBorderColor = Color.Transparent,
-            cursorColor = Color(0xFF745CFF)
-        )
-    )
 }
 
 @Composable
