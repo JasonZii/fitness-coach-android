@@ -44,11 +44,11 @@ private const val REP_COUNTER_LOG_TAG = "RepCounter"
  * Shallow movements that never reach S3 are silently discarded.
  *
  * ── Side-view exercises (right side only) ────────────────────────────────
- *   squat, right_leg_lunge_to_knee_raise, bicep_curl
+ *   squat, lunge_knee_raise, bicep_curl
  *   Only right-side joints are tracked; one [SideState] instance is used.
  *
  * ── Front-view exercises (both sides) ────────────────────────────────────
- *   standing_dumbbell_shoulder_press, dumbbell_lateral_raise
+ *   shoulder_press, lateral_raise
  *   Both sides are tracked independently via separate [SideState] instances.
  *   A rep is counted only when BOTH sides have each completed a full cycle.
  *   Strategy: each side raises its own [SideState.hasCompleted] flag when it
@@ -379,7 +379,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 isBilateral       = false,
             )
 
-            // ── right_leg_lunge_to_knee_raise ──────────────────────────────────────────
+            // ── lunge_knee_raise ──────────────────────────────────────────
             // CAMERA : side view → right side only.
             // JOINT  : right knee — same as squat (hip→knee←ankle).
             //          The right leg is the working leg. Its knee angle drops at the
@@ -390,7 +390,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             //   - Confirm that the knee-raise phase at the top of the movement cycles
             //     S3→S2→S1 cleanly. If the knee stays bent during the raise, a 4th
             //     state or a separate "knee-up" detection may be needed.
-            "right_leg_lunge_to_knee_raise" -> ExerciseConfig(
+            "lunge_knee_raise" -> ExerciseConfig(
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_KNEE,
                 rightP2Idx        = LANDMARK_RIGHT_ANKLE,
@@ -434,7 +434,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 isBilateral       = false,
             )
 
-            // ── standing_dumbbell_shoulder_press ───────────────────────────────────────
+            // ── shoulder_press ───────────────────────────────────────
             // CAMERA : front view → BOTH sides tracked.
             // JOINT  : elbow flexion angle on each side — wrist → elbow ← shoulder.
             //   Right: wrist (R16) → elbow (R14) ← shoulder (R12)
@@ -449,7 +449,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             //     the front reduces the apparent elbow angle — measure real values in Sprint 4.
             //   - If signal quality is poor (arm close to body at start), consider using
             //     shoulder-abduction angle (elbow vs. torso midline) as an alternative.
-            "standing_dumbbell_shoulder_press" -> ExerciseConfig(
+            "shoulder_press" -> ExerciseConfig(
                 rightP1Idx        = LANDMARK_RIGHT_WRIST,
                 rightVertexIdx    = LANDMARK_RIGHT_ELBOW,
                 rightP2Idx        = LANDMARK_RIGHT_SHOULDER,
@@ -464,7 +464,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 isBilateral       = true,
             )
 
-            // ── dumbbell_lateral_raise ─────────────────────────────────────────────────
+            // ── lateral_raise ─────────────────────────────────────────────────
             // CAMERA : front view → BOTH sides tracked.
             // JOINT  : shoulder-abduction angle on each side — hip → shoulder ← wrist.
             //   Right: hip (R24) → shoulder (R12) ← wrist (R16)
@@ -478,7 +478,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
             //     in Sprint 4.
             //   - This angle is sensitive to lateral hip sway. Ensure the user stands
             //     still, or add a hip-stability guard before counting the rep.
-            "dumbbell_lateral_raise" -> ExerciseConfig(
+            "lateral_raise" -> ExerciseConfig(
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_SHOULDER,
                 rightP2Idx        = LANDMARK_RIGHT_WRIST,

@@ -72,10 +72,11 @@ fun AppNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME
+        startDestination = Routes.HOME,
+        modifier = modifier
     ) {
         composable(Routes.HOME) {
-            HomeScreen(navController)
+            HomeScreen(navController, userViewModel)
         }
         composable(Routes.USER) {
             if (userViewModel.isLoggedIn) {
@@ -88,8 +89,7 @@ fun AppNavGraph(
             val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
             TrainingScreen(
                 navController = navController,
-                exerciseId    = exerciseId,
-                modifier      = modifier
+                exerciseId    = exerciseId
             )
         }
         composable(Routes.TRAINING_RESULT_TEMPLATE) { backStackEntry ->

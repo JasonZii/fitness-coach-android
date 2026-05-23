@@ -19,9 +19,9 @@ import kotlin.math.roundToInt
  * The source videos live in res/raw:
  *   squat.mp4
  *   bicep_curl.mp4
- *   dumbbell_lateral_raise.mp4
- *   right_leg_lunge_to_knee_raise.mp4
- *   standing_dumbbell_shoulder_press.mp4
+ *   lateral_raise.mp4
+ *   lunge_knee_raise.mp4
+ *   shoulder_press.mp4
  *
  * JVM unit tests cannot reliably decode Android raw video resources, so this
  * test uses the MediaPipe landmark JSON extracted from those videos under
@@ -67,9 +67,9 @@ class ReferenceClipFrameDropAlgorithmTest {
     private val fixtures = listOf(
         ExerciseFixture("squat", "squat.mp4", "squat.json", parseStep = 2, upperBodyOnly = false),
         ExerciseFixture("bicep_curl", "bicep_curl.mp4", "bicep_curl.json", parseStep = 2, upperBodyOnly = true),
-        ExerciseFixture("dumbbell_lateral_raise", "dumbbell_lateral_raise.mp4", "dumbbell_lateral_raise.json", parseStep = 1, upperBodyOnly = true),
-        ExerciseFixture("right_leg_lunge_to_knee_raise", "right_leg_lunge_to_knee_raise.mp4", "right_leg_lunge_to_knee_raise.json", parseStep = 2, upperBodyOnly = false),
-        ExerciseFixture("standing_dumbbell_shoulder_press", "standing_dumbbell_shoulder_press.mp4", "standing_dumbbell_shoulder_press.json", parseStep = 2, upperBodyOnly = true),
+        ExerciseFixture("lateral_raise", "lateral_raise.mp4", "lateral_raise.json", parseStep = 1, upperBodyOnly = true),
+        ExerciseFixture("lunge_knee_raise", "lunge_knee_raise.mp4", "lunge_knee_raise.json", parseStep = 2, upperBodyOnly = false),
+        ExerciseFixture("shoulder_press", "shoulder_press.mp4", "shoulder_press.json", parseStep = 2, upperBodyOnly = true),
     )
 
     private val clipPlans = listOf(

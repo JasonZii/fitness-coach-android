@@ -9,12 +9,12 @@ import org.junit.Test
 class ExerciseDataTest {
 
     @Test
-    fun `standing dumbbell shoulder press keeps front angle but uses bicep style visibility gate`() {
+    fun `shoulder press keeps front angle but uses bicep style visibility gate`() {
         val bicepCurl = exerciseList.find { it.id == "bicep_curl" }
-        val shoulderPress = exerciseList.find { it.id == "standing_dumbbell_shoulder_press" }
+        val shoulderPress = exerciseList.find { it.id == "shoulder_press" }
 
         assertNotNull("bicep_curl should exist in exerciseList", bicepCurl)
-        assertNotNull("standing_dumbbell_shoulder_press should exist in exerciseList", shoulderPress)
+        assertNotNull("shoulder_press should exist in exerciseList", shoulderPress)
         assertEquals(
             CameraAngle.FRONT,
             shoulderPress!!.requiredCameraAngle,

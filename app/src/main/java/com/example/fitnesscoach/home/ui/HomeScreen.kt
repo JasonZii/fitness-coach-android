@@ -50,12 +50,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
+import com.example.fitnesscoach.user.viewmodel.UserViewModel
 
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(
+    navController: NavHostController,
+    userViewModel: UserViewModel
+) {
     val background = Color(0xFFF7F8FC)
     val primaryText = Color(0xFF141418)
     val secondaryText = Color(0xFF747681)
+    val displayName = if (userViewModel.isLoggedIn && userViewModel.username.isNotBlank()) {
+        userViewModel.username
+    } else {
+        "Guest"
+    }
 
     Column(
         modifier = Modifier
@@ -67,6 +76,7 @@ fun HomeScreen(navController: NavHostController) {
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         HomeHeader(
+            userName = displayName,
             primaryText = primaryText,
             secondaryText = secondaryText
         )
@@ -128,6 +138,7 @@ fun HomeScreen(navController: NavHostController) {
 
 @Composable
 private fun HomeHeader(
+    userName: String,
     primaryText: Color,
     secondaryText: Color
 ) {
@@ -137,12 +148,12 @@ private fun HomeHeader(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Good Morning,",
+                text = "Welcome back,",
                 color = secondaryText,
                 style = MaterialTheme.typography.bodyLarge
             )
             Text(
-                text = "User Name",
+                text = userName,
                 color = primaryText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold

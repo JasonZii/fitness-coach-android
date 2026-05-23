@@ -46,7 +46,7 @@ fun parseReferencePoseJson(
  * Files already recorded at ~30 FPS that must NOT be downsampled.
  * All other files are assumed to be 60 FPS and use [REFERENCE_POSE_DOWNSAMPLE_STEP].
  */
-private val ALREADY_30FPS = setOf("dumbbell_lateral_raise.json")
+private val ALREADY_30FPS = setOf("lateral_raise.json")
 
 private fun stepFor(assetFileName: String): Int =
     if (assetFileName in ALREADY_30FPS) 1 else REFERENCE_POSE_DOWNSAMPLE_STEP

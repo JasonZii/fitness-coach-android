@@ -51,7 +51,7 @@ class EvaluateExerciseUseCase {
             upperBodyOnly,
             bicepCurlOnly = exerciseId == "bicep_curl",
             squatOnly = exerciseId == "squat",
-            lungeOnly = exerciseId == "right_leg_lunge_to_knee_raise"
+            lungeOnly = exerciseId == "lunge_knee_raise"
         )
     }
 }

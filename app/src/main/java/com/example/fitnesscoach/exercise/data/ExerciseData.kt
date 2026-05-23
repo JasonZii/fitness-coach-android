@@ -60,10 +60,10 @@ val exerciseList = listOf(
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
-        id = "dumbbell_lateral_raise",
-        title = "Dumbbell Lateral Raise",
+        id = "lateral_raise",
+        title = "Lateral Raise",
         description = """
-        How to Perform a Dumbbell Lateral Raise:
+        How to Perform a Lateral Raise:
         Stand upright with a dumbbell in each hand at your sides.
         Keep your back straight and core engaged.
         Raise both arms out to the sides until they reach shoulder height.
@@ -74,9 +74,9 @@ val exerciseList = listOf(
         Tip:
         Avoid swinging your body. Use controlled movement to target your shoulders.
         """.trimIndent(),
-        imageRes = R.drawable.dumbbell_lateral_raise,
-        videoRes = R.raw.dumbbell_lateral_raise,
-        jsonFileName = "dumbbell_lateral_raise.json",
+        imageRes = R.drawable.lateral_raise,
+        videoRes = R.raw.lateral_raise,
+        jsonFileName = "lateral_raise.json",
         requiredCameraAngle = CameraAngle.FRONT,
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
@@ -108,10 +108,10 @@ val exerciseList = listOf(
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
-        id = "right_leg_lunge_to_knee_raise",
-        title = "Right Leg Lunge To Knee Raise",
+        id = "lunge_knee_raise",
+        title = "Lunge Knee Raise",
         description = """
-        How to Perform a Right Leg Lunge to Knee Raise:
+        How to Perform a Lunge Knee Raise:
         Stand upright with feet together.
         Step forward with your right leg into a lunge position.
         Lower your body until both knees are bent at about 90 degrees.
@@ -122,9 +122,9 @@ val exerciseList = listOf(
         Tip:
         Keep your balance and engage your core throughout the movement.
         """.trimIndent(),
-        imageRes = R.drawable.right_leg_lunge_to_knee_raise,
-        videoRes = R.raw.right_leg_lunge_to_knee_raise,
-        jsonFileName = "right_leg_lunge_to_knee_raise.json",
+        imageRes = R.drawable.lunge_knee_raise,
+        videoRes = R.raw.lunge_knee_raise,
+        jsonFileName = "lunge_knee_raise.json",
         requiredCameraAngle = CameraAngle.SIDE,
         requiresFullBody = true,
         requiredSideViewDirection = SideViewDirection.RIGHT,
@@ -132,10 +132,10 @@ val exerciseList = listOf(
         readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
     ),
     ExerciseInfo(
-        id = "standing_dumbbell_shoulder_press",
-        title = "Standing Dumbbell Shoulder Press",
+        id = "shoulder_press",
+        title = "Shoulder Press",
         description = """
-        How to Perform a Standing Dumbbell Shoulder Press:
+        How to Perform a Shoulder Press:
         Stand with a dumbbell in each hand at shoulder height.
         Keep your palms facing forward.
         Press the dumbbells upward until your arms are fully extended.
@@ -145,9 +145,9 @@ val exerciseList = listOf(
         Tip:
         Avoid arching your back. Keep your core tight and stable.
         """.trimIndent(),
-        imageRes = R.drawable.standing_dumbbell_shoulder_press,
-        videoRes = R.raw.standing_dumbbell_shoulder_press,
-        jsonFileName = "standing_dumbbell_shoulder_press.json",
+        imageRes = R.drawable.shoulder_press,
+        videoRes = R.raw.shoulder_press,
+        jsonFileName = "shoulder_press.json",
         requiredCameraAngle = CameraAngle.FRONT,
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
