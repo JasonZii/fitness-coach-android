@@ -206,7 +206,7 @@ fun RegisterScreen(navController: NavHostController, userViewModel: UserViewMode
                 },
                 modifier = Modifier.weight(1f)
             ) {
-                Text("Create Account")
+                Text("Create")
             }
         }
 

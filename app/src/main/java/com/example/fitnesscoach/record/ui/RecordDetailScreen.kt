@@ -47,10 +47,10 @@ fun RecordDetailScreen(
 
 //    val imageRes = when (record?.exerciseId) {
 //        "squat" -> R.drawable.squat
-//        "dumbbell_lateral_raise" -> R.drawable.dumbbell_lateral_raise
+//        "lateral_raise" -> R.drawable.lateral_raise
 //        "bicep_curl" -> R.drawable.bicep_curl
-//        "right_leg_lunge_to_knee_raise" -> R.drawable.right_leg_lunge_to_knee_raise
-//        "standing_dumbbell_shoulder_press" -> R.drawable.standing_dumbbell_shoulder_press
+//        "lunge_knee_raise" -> R.drawable.lunge_knee_raise
+//        "shoulder_press" -> R.drawable.shoulder_press
 //        else -> null
 //    }
 

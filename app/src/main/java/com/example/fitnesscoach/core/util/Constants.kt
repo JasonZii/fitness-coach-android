@@ -60,7 +60,7 @@ object Constants {
     const val SQUAT_S1_ANGLE = 163f   // standing straight;    angle ≥ this → S1 territory
     const val SQUAT_S3_ANGLE = 80f    // fully squatted;       angle ≤ this → S3 territory
 
-    // State machine thresholds — Right Leg Lunge to Knee Raise (right_leg_lunge_to_knee_raise)
+    // State machine thresholds — Lunge Knee Raise (lunge_knee_raise)
     // Calibrated from reference JSON (163 frames): abs max 179.8°, abs min 64.0°; margin ±15°.
     const val LUNGE_S1_ANGLE = 165f   // standing straight;    angle ≥ this → S1 territory
     const val LUNGE_S3_ANGLE = 79f    // lunge bottom;         angle ≤ this → S3 territory
@@ -70,12 +70,12 @@ object Constants {
     const val BICEP_CURL_S1_ANGLE = 160f   // arm fully extended;  angle ≥ this → S1 territory
     const val BICEP_CURL_S3_ANGLE = 70f    // curl peak;           angle ≤ this → S3 territory
 
-    // State machine thresholds — Standing Dumbbell Shoulder Press (standing_dumbbell_shoulder_press)
+    // State machine thresholds — Shoulder Press (shoulder_press)
     // Calibrated from reference JSON (187 frames): abs min 39.4°, abs max 174.3°; margin ±15°.
     const val SHOULDER_PRESS_S1_ANGLE = 54f    // arms at shoulder height; angle ≤ this → S1 territory
     const val SHOULDER_PRESS_S3_ANGLE = 159f   // fully pressed overhead;  angle ≥ this → S3 territory
 
-    // State machine thresholds — Dumbbell Lateral Raise (dumbbell_lateral_raise)
+    // State machine thresholds — Lateral Raise (lateral_raise)
     // Calibrated from reference JSON (81 frames): abs min 10.3°, abs max 101.6°; margin ±15°.
     const val LATERAL_RAISE_S1_ANGLE = 25f   // arm at side;            angle ≤ this → S1 territory
     const val LATERAL_RAISE_S3_ANGLE = 87f   // arm raised to shoulder; angle ≥ this → S3 territory

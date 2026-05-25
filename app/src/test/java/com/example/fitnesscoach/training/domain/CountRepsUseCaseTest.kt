@@ -291,7 +291,7 @@ class SquatTests {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Unit tests for **standing_dumbbell_shoulder_press** (bilateral, front view).
+ * Unit tests for **shoulder_press** (bilateral, front view).
  *
  * The bilateral logic — both sides must complete a cycle before a rep is counted
  * — is exercised here. The angle geometry is the same formula as squats but
@@ -309,7 +309,7 @@ class ShoulderPressTests {
 
     @Before
     fun setUp() {
-        useCase = CountRepsUseCase("standing_dumbbell_shoulder_press")
+        useCase = CountRepsUseCase("shoulder_press")
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -442,7 +442,7 @@ class ShoulderPressTests {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Stub test class for **right_leg_lunge_to_knee_raise**.
+ * Stub test class for **lunge_knee_raise**.
  *
  * Follow [SquatTests] exactly — joint is the same (right knee), thresholds may
  * differ after Sprint 4. Key additional concern: verify the knee-raise phase
@@ -451,7 +451,7 @@ class ShoulderPressTests {
  * TODO (Sprint 4): implement after calibrating LUNGE_S1/S3_ANGLE.
  */
 class LungeTests {
-    // TODO: mirror SquatTests using CountRepsUseCase("right_leg_lunge_to_knee_raise")
+    // TODO: mirror SquatTests using CountRepsUseCase("lunge_knee_raise")
     //       and LUNGE_S1_ANGLE / LUNGE_S3_ANGLE constants.
 }
 
@@ -471,7 +471,7 @@ class BicepCurlTests {
 }
 
 /**
- * Stub test class for **dumbbell_lateral_raise**.
+ * Stub test class for **lateral_raise**.
  *
  * Joint: shoulder abduction angle on each side (hip→shoulder←wrist). Bilateral,
  * front view — the bilateral async tests in [ShoulderPressTests] are a good
@@ -481,7 +481,7 @@ class BicepCurlTests {
  *                  Also add a hip-stability guard test if one is added to the impl.
  */
 class LateralRaiseTests {
-    // TODO: mirror ShoulderPressTests using CountRepsUseCase("dumbbell_lateral_raise")
+    // TODO: mirror ShoulderPressTests using CountRepsUseCase("lateral_raise")
     //       and LATERAL_RAISE_S1_ANGLE / LATERAL_RAISE_S3_ANGLE constants.
     //       Use left hip/shoulder/wrist indices for the left side landmarks.
 }
