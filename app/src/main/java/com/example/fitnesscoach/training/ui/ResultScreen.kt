@@ -102,7 +102,6 @@ fun ResultScreen(
                         style = MaterialTheme.typography.titleLarge
                     )
                     ResultInfoRow(label = "Exercise",        value = exerciseName)
-                    ResultInfoRow(label = "Duration",        value = "--")
                     ResultInfoRow(label = "Repetitions",     value = "$repCount")
                     ResultInfoRow(label = "Correct",         value = "$correctReps")
                     ResultInfoRow(label = "Incorrect",       value = "$incorrectReps")

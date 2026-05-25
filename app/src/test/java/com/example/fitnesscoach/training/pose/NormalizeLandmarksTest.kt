@@ -53,7 +53,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.7f, 0.6f, 0f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
         assertEquals("Output must contain exactly 33 pairs", LANDMARK_COUNT, result.size)
     }
 
@@ -69,7 +69,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.6f, 0.5f, 0.0f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
 
         val hipMidX = (result[LANDMARK_LEFT_HIP].first  + result[LANDMARK_RIGHT_HIP].first)  / 2f
         val hipMidY = (result[LANDMARK_LEFT_HIP].second + result[LANDMARK_RIGHT_HIP].second) / 2f
@@ -95,7 +95,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.3f, 0.35f, 0f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
 
         val hipMidX = (result[LANDMARK_LEFT_HIP].first  + result[LANDMARK_RIGHT_HIP].first)  / 2f
         val hipMidY = (result[LANDMARK_LEFT_HIP].second + result[LANDMARK_RIGHT_HIP].second) / 2f
@@ -116,7 +116,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.6f, 0.5f, 0.0f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
 
         val shoulderMidX = (result[LANDMARK_LEFT_SHOULDER].first  + result[LANDMARK_RIGHT_SHOULDER].first)  / 2f
         val shoulderMidY = (result[LANDMARK_LEFT_SHOULDER].second + result[LANDMARK_RIGHT_SHOULDER].second) / 2f
@@ -144,7 +144,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.55f, 0.70f, 0f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
 
         val shoulderMidX = (result[LANDMARK_LEFT_SHOULDER].first  + result[LANDMARK_RIGHT_SHOULDER].first)  / 2f
         val shoulderMidY = (result[LANDMARK_LEFT_SHOULDER].second + result[LANDMARK_RIGHT_SHOULDER].second) / 2f
@@ -173,7 +173,7 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.62f, 0.55f, 0.01f),
             )
         )
-        val result = normalizeLandmarks(frame)
+        val result = normalizeLandmarks(frame)!!
 
         // AC-3
         assertEquals(LANDMARK_COUNT, result.size)
@@ -215,8 +215,8 @@ class NormalizeLandmarksTest {
                 LANDMARK_RIGHT_HIP      to Triple(0.6f, 0.5f, -0.99f),
             )
         )
-        val resultA = normalizeLandmarks(frameA)
-        val resultB = normalizeLandmarks(frameB)
+        val resultA = normalizeLandmarks(frameA)!!
+        val resultB = normalizeLandmarks(frameB)!!
 
         resultA.zip(resultB).forEachIndexed { i, (a, b) ->
             assertEquals("x at index $i should be equal", a.first,  b.first,  0f)

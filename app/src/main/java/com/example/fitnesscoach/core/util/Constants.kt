@@ -28,7 +28,7 @@ object Constants {
 
     // Module 2: OE-DTW real-time alignment
     // Minimum user sequence length before alignment is considered stable
-    const val OE_DTW_MIN_FRAMES = 15
+    const val OE_DTW_MIN_FRAMES = 8
     // Reference JSON files are recorded at 60 FPS; device analysis runs at ~15–30 FPS.
     // Taking every Nth frame brings the reference down to ~30 FPS and eliminates
     // the "one-to-many" DTW stretch that wastes CPU and causes blue-skeleton lag.
@@ -85,10 +85,8 @@ object Constants {
     const val MAX_CONSECUTIVE_RED_FRAMES = 15
 
     // Module 6: Training end detection
-    // Average visibility of key landmarks below this triggers pause
-    const val END_VISIBILITY_THRESHOLD = 0.3f
-    // Seconds below threshold required to confirm training end
-    const val END_VISIBILITY_HOLD_SECONDS = 3
     // Shoulder-width ratio multiplier to detect user walking toward camera
     const val END_SHOULDER_WIDTH_RATIO = 1.5f
+    // Milliseconds the "too close" condition must hold continuously before DETECTED is returned
+    const val END_CLOSE_HOLD_MS = 500L
 }

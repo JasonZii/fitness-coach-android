@@ -19,9 +19,9 @@ class PoseScoringEngineTest {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** 33 identical landmarks at (x, y). */
+    /** 33 identical landmarks at (x, y, 0). */
     private fun uniformLandmarks(x: Float = 0.5f, y: Float = 0.5f) =
-        List(LANDMARK_COUNT) { Pair(x, y) }
+        List(LANDMARK_COUNT) { Triple(x, y, 0f) }
 
     // ── Output size (RULES.md §4.4) ──────────────────────────────────────────
 
@@ -87,7 +87,7 @@ class PoseScoringEngineTest {
         val ref = uniformLandmarks()
         val user = uniformLandmarks().toMutableList()
         // Large offset — Euclidean distance ≈ 0.566 → Sp = (1 - 0.566)*100 ≈ 43 < 80
-        user[0] = Pair(0.9f, 0.9f)
+        user[0] = Triple(0.9f, 0.9f, 0f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         assertTrue(
@@ -97,20 +97,28 @@ class PoseScoringEngineTest {
     }
 
     @Test
-    fun calculatePoseScore_reversedConnectedLimb_affectedJointColorIsRed() {
+    fun calculatePoseScore_shiftedJoint_affectedJointColorIsRed() {
+        // Joint color is driven by the angle score of its connected limbs, not by joint
+        // position score (Sp).  Landmark 0 (nose) has no connected scored limb and is
+        // always GREEN.  To test joint RED coloring, we need a joint in JOINT_LIMB_MAP
+        // with a non-zero reference limb vector so the angle error registers.
+        //
+        // Limb 0: left upper arm, joints 11 → 13.
+        // Ref vector points right (+x); user vector points left (−x) → 180° → limbScore[0] ≈ 0.
+        // Joint 13 (left elbow) is connected to limbs 0 and 1 → turns RED.
         val ref = uniformLandmarks().toMutableList()
-        val user = uniformLandmarks().toMutableList()
+        ref[11] = Triple(0.3f, 0.5f, 0f)
+        ref[13] = Triple(0.7f, 0.5f, 0f)
 
-        ref[11] = Pair(0.3f, 0.5f)
-        ref[13] = Pair(0.7f, 0.5f)
-        user[11] = Pair(0.3f, 0.5f)
-        user[13] = Pair(0.0f, 0.5f)
+        val user = uniformLandmarks().toMutableList()
+        user[11] = Triple(0.3f, 0.5f, 0f)
+        user[13] = Triple(0.0f, 0.5f, 0f)   // reversed direction
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         assertEquals(
-            "jointColors[11] must be RED when a connected limb score is below $SCORE_RED_THRESHOLD",
+            "jointColors[13] must be RED when its connected limb has 180° angle error",
             Color.Red,
-            result.jointColors[11]
+            result.jointColors[13]
         )
     }
 
@@ -119,7 +127,7 @@ class PoseScoringEngineTest {
         val ref = uniformLandmarks()
         val user = uniformLandmarks().toMutableList()
         // Only landmark 0 is shifted; all others are identical.
-        user[0] = Pair(0.9f, 0.9f)
+        user[0] = Triple(0.9f, 0.9f, 0f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         // Landmarks 1..32 are identical → Sp = 100 >= 80 → GREEN
@@ -151,10 +159,10 @@ class PoseScoringEngineTest {
 
         // Limb 0: left upper arm, joints 11 → 13.
         // Reference vector points right (+x); user vector points left (−x) → 180° → Sl ≈ 0.
-        ref[11] = Pair(0.3f, 0.5f)
-        ref[13] = Pair(0.7f, 0.5f)
-        user[11] = Pair(0.3f, 0.5f)
-        user[13] = Pair(0.0f, 0.5f)
+        ref[11] = Triple(0.3f, 0.5f, 0f)
+        ref[13] = Triple(0.7f, 0.5f, 0f)
+        user[11] = Triple(0.3f, 0.5f, 0f)
+        user[13] = Triple(0.0f, 0.5f, 0f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         assertTrue(
@@ -168,10 +176,10 @@ class PoseScoringEngineTest {
         val ref = uniformLandmarks().toMutableList()
         val user = uniformLandmarks().toMutableList()
 
-        ref[11] = Pair(0.3f, 0.5f)
-        ref[13] = Pair(0.7f, 0.5f)
-        user[11] = Pair(0.3f, 0.5f)
-        user[13] = Pair(0.0f, 0.5f)
+        ref[11] = Triple(0.3f, 0.5f, 0f)
+        ref[13] = Triple(0.7f, 0.5f, 0f)
+        user[11] = Triple(0.3f, 0.5f, 0f)
+        user[13] = Triple(0.0f, 0.5f, 0f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         assertEquals(
@@ -195,7 +203,7 @@ class PoseScoringEngineTest {
     fun calculatePoseScore_shiftedJoint_sfEqualsWeightedSumOfS1AndS2() {
         val ref = uniformLandmarks()
         val user = uniformLandmarks().toMutableList()
-        user[5] = Pair(0.8f, 0.8f)
+        user[5] = Triple(0.8f, 0.8f, 0f)
 
         val result = PoseScoringEngine.calculatePoseScore(user, ref)
         val expected = (0.2f * result.s1 + 0.8f * result.s2).coerceIn(0f, 100f)
@@ -207,7 +215,7 @@ class PoseScoringEngineTest {
     @Test(expected = IllegalArgumentException::class)
     fun calculatePoseScore_userLandmarksTooFew_throwsIllegalArgumentException() {
         PoseScoringEngine.calculatePoseScore(
-            List(32) { Pair(0.5f, 0.5f) },
+            List(32) { Triple(0.5f, 0.5f, 0f) },
             uniformLandmarks()
         )
     }
@@ -216,14 +224,14 @@ class PoseScoringEngineTest {
     fun calculatePoseScore_referenceLandmarksTooFew_throwsIllegalArgumentException() {
         PoseScoringEngine.calculatePoseScore(
             uniformLandmarks(),
-            List(32) { Pair(0.5f, 0.5f) }
+            List(32) { Triple(0.5f, 0.5f, 0f) }
         )
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun calculatePoseScore_userLandmarksTooMany_throwsIllegalArgumentException() {
         PoseScoringEngine.calculatePoseScore(
-            List(34) { Pair(0.5f, 0.5f) },
+            List(34) { Triple(0.5f, 0.5f, 0f) },
             uniformLandmarks()
         )
     }

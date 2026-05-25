@@ -1,92 +1,44 @@
 package com.example.fitnesscoach.training.pose
 
+import com.example.fitnesscoach.core.util.Constants.END_CLOSE_HOLD_MS
 import com.example.fitnesscoach.core.util.Constants.END_SHOULDER_WIDTH_RATIO
-import com.example.fitnesscoach.core.util.Constants.END_VISIBILITY_HOLD_SECONDS
-import com.example.fitnesscoach.core.util.Constants.END_VISIBILITY_THRESHOLD
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_NOSE
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
-import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
+import com.example.fitnesscoach.core.util.Constants.VISIBILITY_IN_FRAME_MIN
 import kotlin.math.sqrt
 
-/**
- * Landmark indices checked for the low-visibility pause condition (ALGORITHM.md Module 6).
- * Average visibility of these five landmarks below [END_VISIBILITY_THRESHOLD] for
- * [END_VISIBILITY_HOLD_SECONDS] seconds triggers a pause.
- */
-private val PAUSE_VISIBILITY_INDICES = intArrayOf(
-    LANDMARK_NOSE,
-    LANDMARK_LEFT_SHOULDER,
-    LANDMARK_RIGHT_SHOULDER,
-    LANDMARK_LEFT_HIP,
-    LANDMARK_RIGHT_HIP,
-)
-
-/**
- * Training-session pause state returned by [TrainingEndDetector.update].
- */
-enum class TrainingPauseState {
+enum class TrainingEndState {
     /** Normal: training data should be accumulated. */
     ACTIVE,
-    /** Paused: the current rep should be discarded and accumulation halted. */
-    PAUSED,
+    /** User is too close to the camera — skip algorithm, await manual stop. */
+    DETECTED,
 }
 
 /**
- * Detects two conditions that should pause (and later resume) the training session
- * (ALGORITHM.md Module 6):
+ * Detects when the user has walked close to the camera, indicating intent to end the session.
  *
- * **Condition 1 – low visibility**: The average visibility of the five key landmarks
- * (nose, both shoulders, both hips) falls below [END_VISIBILITY_THRESHOLD] (0.3) for
- * at least [END_VISIBILITY_HOLD_SECONDS] (3) consecutive seconds.
- * Resume: the average visibility returns to or above the threshold.
- *
- * **Condition 2 – too close**: The pixel distance between the two shoulders exceeds
+ * **Condition – too close**: The Euclidean distance between the two shoulders exceeds
  * [END_SHOULDER_WIDTH_RATIO] (1.5×) times the baseline shoulder width captured at
- * [onTrainingStart]. This fires immediately (no hold period) and indicates the user
- * has stepped toward the camera.
- * Resume: the shoulder width drops back to or below the threshold.
+ * [onTrainingStart]. The condition must hold continuously for [END_CLOSE_HOLD_MS] (500 ms)
+ * before [DETECTED] is returned; a single noisy frame will not trigger it.
+ * Frames where either shoulder landmark has visibility below [VISIBILITY_IN_FRAME_MIN] are
+ * treated as "not close" and reset the hold timer, preventing MediaPipe extrapolation
+ * artifacts from causing false detections.
+ * Side-view exercises are exempt because the side-on baseline shoulder width is near-zero,
+ * which would cause false positives on any movement.
  *
- * Time is injected as [nowMs] so the class is pure Kotlin and directly unit-testable.
- *
- * Usage:
- * ```
- * val detector = TrainingEndDetector()
- * // On READINESS → TRAINING transition:
- * detector.onTrainingStart(poseResult.landmarks)
- * // Each training frame:
- * val state = detector.update(poseResult.landmarks, poseResult.visibilities, nowMs)
- * ```
+ * When [DETECTED], the caller should silently skip the training algorithm for that frame.
+ * No UI pause banner is shown; the user ends the session by pressing Stop.
  */
 class TrainingEndDetector {
 
-    /** Shoulder pixel distance recorded at the moment training starts. */
     private var baselineShoulderWidth: Float = 0f
-
-    /**
-     * Required camera angle for the current exercise, set by [onTrainingStart].
-     * SIDE-view exercises disable [isTooClose] because the baseline shoulder width
-     * is near-zero when viewed sideways, causing false positives on any movement.
-     */
     private var requiredCameraAngle: CameraAngle = CameraAngle.FRONT
-
-    /**
-     * Timestamp (ms) when the average landmark visibility first dropped below threshold.
-     * Null when visibility is at or above the threshold.
-     */
-    private var visibilityDropSinceMs: Long? = null
-
-    /** Whether the detector is currently in a paused state. */
-    private var currentState: TrainingPauseState = TrainingPauseState.ACTIVE
-
-    // ── Public API ────────────────────────────────────────────────────────────
+    private var tooCloseStartedAt: Long? = null
 
     /**
      * Records the baseline shoulder width from the first training frame.
      * Must be called exactly once when the session transitions from READINESS to TRAINING.
-     *
-     * @param landmarks Raw MediaPipe landmarks for the starting frame.
      */
     fun onTrainingStart(
         landmarks: List<Triple<Float, Float, Float>>,
@@ -94,80 +46,50 @@ class TrainingEndDetector {
     ) {
         baselineShoulderWidth = shoulderWidth(landmarks)
         this.requiredCameraAngle = requiredCameraAngle
-        visibilityDropSinceMs = null
-        currentState = TrainingPauseState.ACTIVE
     }
 
     /**
-     * Evaluates the current frame for pause conditions.
+     * Evaluates the current frame for the too-close condition.
      *
-     * @param landmarks   Raw MediaPipe (x, y, z) landmarks for this frame.
-     * @param visibilities Per-landmark visibility scores from MediaPipe (index 0–32).
-     * @param nowMs        Current wall-clock time in milliseconds.
-     * @return [TrainingPauseState.PAUSED] if either condition fires; [TrainingPauseState.ACTIVE] otherwise.
+     * [visibilities] filters frames where either shoulder landmark is unreliable (below
+     * [VISIBILITY_IN_FRAME_MIN]); such frames reset the hold timer and return [ACTIVE].
+     * [frameTimestamp] drives the [END_CLOSE_HOLD_MS] hold period: [DETECTED] is only
+     * returned after the condition has been continuously true for 500 ms.
      */
     fun update(
         landmarks: List<Triple<Float, Float, Float>>,
         visibilities: List<Float>,
-        nowMs: Long,
-    ): TrainingPauseState {
-        val tooClose      = isTooClose(landmarks)
-        val lowVisibility = isLowVisibility(visibilities, nowMs)
-
-        currentState = if (tooClose || lowVisibility) TrainingPauseState.PAUSED else TrainingPauseState.ACTIVE
-        return currentState
+        frameTimestamp: Long,
+    ): TrainingEndState {
+        if (!isTooClose(landmarks, visibilities)) {
+            tooCloseStartedAt = null
+            return TrainingEndState.ACTIVE
+        }
+        val startedAt = tooCloseStartedAt ?: frameTimestamp.also { tooCloseStartedAt = it }
+        return if (frameTimestamp - startedAt >= END_CLOSE_HOLD_MS)
+            TrainingEndState.DETECTED
+        else
+            TrainingEndState.ACTIVE
     }
 
-    /**
-     * Resets all state. Call when the user explicitly stops training or the session ends.
-     */
+    /** Resets all state. Call when the user stops training or switches exercise. */
     fun reset() {
         baselineShoulderWidth = 0f
         requiredCameraAngle = CameraAngle.FRONT
-        visibilityDropSinceMs = null
-        currentState = TrainingPauseState.ACTIVE
+        tooCloseStartedAt = null
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /**
-     * Condition 2: returns true when the current shoulder width exceeds
-     * baselineShoulderWidth × [END_SHOULDER_WIDTH_RATIO].
-     * Returns false before [onTrainingStart] is called (baseline == 0).
-     */
-    private fun isTooClose(landmarks: List<Triple<Float, Float, Float>>): Boolean {
-        // Side-view baseline shoulder width is near-zero (both shoulders overlap on x-axis),
-        // so any movement would exceed the 1.5× ratio — disable this check for side view.
+    private fun isTooClose(
+        landmarks: List<Triple<Float, Float, Float>>,
+        visibilities: List<Float>,
+    ): Boolean {
         if (requiredCameraAngle == CameraAngle.SIDE) return false
         if (baselineShoulderWidth < 1e-6f) return false
-        val current = shoulderWidth(landmarks)
-        return current > baselineShoulderWidth * END_SHOULDER_WIDTH_RATIO
+        if (visibilities[LANDMARK_LEFT_SHOULDER]  < VISIBILITY_IN_FRAME_MIN) return false
+        if (visibilities[LANDMARK_RIGHT_SHOULDER] < VISIBILITY_IN_FRAME_MIN) return false
+        return shoulderWidth(landmarks) > baselineShoulderWidth * END_SHOULDER_WIDTH_RATIO
     }
 
-    /**
-     * Condition 1: returns true when the key-landmark average visibility has been
-     * below [END_VISIBILITY_THRESHOLD] for at least [END_VISIBILITY_HOLD_SECONDS] seconds.
-     * Clears the timer when visibility recovers.
-     */
-    private fun isLowVisibility(visibilities: List<Float>, nowMs: Long): Boolean {
-        val avgVisibility = PAUSE_VISIBILITY_INDICES
-            .map { visibilities[it] }
-            .average()
-            .toFloat()
-
-        return if (avgVisibility < END_VISIBILITY_THRESHOLD) {
-            if (visibilityDropSinceMs == null) visibilityDropSinceMs = nowMs
-            val elapsedMs = nowMs - visibilityDropSinceMs!!
-            elapsedMs >= END_VISIBILITY_HOLD_SECONDS * 1_000L
-        } else {
-            visibilityDropSinceMs = null   // visibility recovered — reset timer
-            false
-        }
-    }
-
-    /**
-     * Euclidean distance between left and right shoulder landmarks (x, y only).
-     */
     private fun shoulderWidth(landmarks: List<Triple<Float, Float, Float>>): Float {
         val left  = landmarks[LANDMARK_LEFT_SHOULDER]
         val right = landmarks[LANDMARK_RIGHT_SHOULDER]

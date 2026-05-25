@@ -2,7 +2,6 @@ package com.example.fitnesscoach.training.data
 
 import android.content.Context
 import com.example.fitnesscoach.core.util.Constants.REFERENCE_POSE_DOWNSAMPLE_STEP
-import com.example.fitnesscoach.training.pose.normalizeLandmarks
 import org.json.JSONObject
 
 /**
@@ -74,25 +73,3 @@ fun loadRawReferenceSequence(
     return parseReferencePoseJson(json, stepFor(assetFileName))
 }
 
-/**
- * Loads a standard-action landmarks JSON from assets/, normalises every frame
- * with [normalizeLandmarks], and returns the downsampled result ready for
- * [alignOeDtw].
- *
- * Called once at training startup per ALGORITHM.md §Module 1 (Context 1).
- *
- * @param context       Android Context used to open the asset file.
- * @param assetFileName File name inside assets/landmarks/, e.g. "squat.json".
- * @return Normalised reference sequence: outer index = frame, inner index =
- *         landmark (0–32), value = normalised (x, y, z) triple.
- */
-fun loadReferenceSequence(
-    context: Context,
-    assetFileName: String,
-): List<List<Triple<Float, Float, Float>>> {
-    val json = context.assets
-        .open("landmarks/$assetFileName")
-        .bufferedReader()
-        .readText()
-    return parseReferencePoseJson(json, stepFor(assetFileName)).map { normalizeLandmarks(it) }
-}

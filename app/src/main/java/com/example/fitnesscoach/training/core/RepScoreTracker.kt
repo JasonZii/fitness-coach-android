@@ -1,5 +1,7 @@
 package com.example.fitnesscoach.training.core
 
+import androidx.compose.ui.graphics.Color
+import com.example.fitnesscoach.core.util.Constants.LIMB_COUNT
 import com.example.fitnesscoach.core.util.Constants.MAX_CONSECUTIVE_RED_FRAMES
 
 class RepScoreTracker {
@@ -7,12 +9,17 @@ class RepScoreTracker {
     private val completedRepScores = mutableListOf<Float>()
 
     // ── Red Light Tracking (Correct/Incorrect Logic) ──
-    private var currentConsecutiveRed = 0
-    private var maxConsecutiveRed = 0
+    // Per-limb counters: a limb is considered persistently wrong only when the same
+    // limb has been red for more than MAX_CONSECUTIVE_RED_FRAMES consecutive frames.
+    private val currentConsecutiveRedPerLimb = IntArray(LIMB_COUNT)
+    private val maxConsecutiveRedPerLimb = IntArray(LIMB_COUNT)
 
-    val currentConsecutiveRedFrames: Int
-        get() = currentConsecutiveRed
-    
+    // Supplied to TrainingViewModel each frame to drive per-limb visual color output.
+    val visualLimbIsRed: BooleanArray
+        get() = BooleanArray(LIMB_COUNT) { i ->
+            currentConsecutiveRedPerLimb[i] > MAX_CONSECUTIVE_RED_FRAMES
+        }
+
     // ── Final Rep Counts ──
     var correctReps = 0
         private set
@@ -25,32 +32,35 @@ class RepScoreTracker {
                 else completedRepScores.average().toFloat()
 
     /**
-     * Adds the current frame's overall score [sf] and whether any joint/limb is red [hasRedPart].
+     * Adds the current frame's overall score [sf] and per-limb colors [limbColors].
+     * Each limb's consecutive-red counter increments independently; only a limb that
+     * stays red for more than MAX_CONSECUTIVE_RED_FRAMES frames triggers visual feedback.
      */
-    fun addFrameScore(sf: Float, hasRedPart: Boolean) {
+    fun addFrameScore(sf: Float, limbColors: List<Color>) {
         currentRepFrameScores.add(sf)
-        
-        if (hasRedPart) {
-            currentConsecutiveRed++
-            if (currentConsecutiveRed > maxConsecutiveRed) {
-                maxConsecutiveRed = currentConsecutiveRed
+        for (i in 0 until LIMB_COUNT) {
+            if (i < limbColors.size && limbColors[i] == Color.Red) {
+                currentConsecutiveRedPerLimb[i]++
+                if (currentConsecutiveRedPerLimb[i] > maxConsecutiveRedPerLimb[i]) {
+                    maxConsecutiveRedPerLimb[i] = currentConsecutiveRedPerLimb[i]
+                }
+            } else {
+                currentConsecutiveRedPerLimb[i] = 0
             }
-        } else {
-            currentConsecutiveRed = 0
         }
     }
 
     /**
      * Seals the current rep, calculates the average score, updates correct/incorrect counts.
+     * A rep is INCORRECT when any single limb's max consecutive red run exceeds the threshold.
      */
     fun finishRep(): Float {
         if (currentRepFrameScores.isEmpty()) return 0f
 
         val repScore = currentRepFrameScores.average().toFloat()
         completedRepScores.add(repScore)
-        
-        // If max continuous red frames across this rep is <= MAX_CONSECUTIVE_RED_FRAMES (~0.25s), it's considered CORRECT
-        if (maxConsecutiveRed <= MAX_CONSECUTIVE_RED_FRAMES) {
+
+        if (maxConsecutiveRedPerLimb.none { it > MAX_CONSECUTIVE_RED_FRAMES }) {
             correctReps++
         } else {
             incorrectReps++
@@ -58,9 +68,9 @@ class RepScoreTracker {
 
         // Reset per-rep counters
         currentRepFrameScores.clear()
-        currentConsecutiveRed = 0
-        maxConsecutiveRed = 0
-        
+        currentConsecutiveRedPerLimb.fill(0)
+        maxConsecutiveRedPerLimb.fill(0)
+
         return repScore
     }
 
@@ -73,8 +83,8 @@ class RepScoreTracker {
      */
     fun discardCurrentRep() {
         currentRepFrameScores.clear()
-        currentConsecutiveRed = 0
-        maxConsecutiveRed = 0
+        currentConsecutiveRedPerLimb.fill(0)
+        maxConsecutiveRedPerLimb.fill(0)
     }
 
     /**
@@ -84,8 +94,8 @@ class RepScoreTracker {
     fun reset() {
         currentRepFrameScores.clear()
         completedRepScores.clear()
-        currentConsecutiveRed = 0
-        maxConsecutiveRed = 0
+        currentConsecutiveRedPerLimb.fill(0)
+        maxConsecutiveRedPerLimb.fill(0)
         correctReps = 0
         incorrectReps = 0
     }

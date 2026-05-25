@@ -154,7 +154,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                     }
                 }
                 RepState.S3 -> {
-                    if (angle < s3Angle) repState = RepState.S2
+                    if (angle < s3ExitAngle) repState = RepState.S2
                 }
             }
         }
@@ -189,12 +189,12 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
         val rightP1Idx:        Int,
         val rightVertexIdx:    Int,
         val rightP2Idx:        Int,
-        val rightVisLandmarks: List<Int>,
+        val rightVisibilityLandmarks: List<Int>,
         // ── Left side (only used when isBilateral = true) ─────────────────────
         val leftP1Idx:         Int,
         val leftVertexIdx:     Int,
         val leftP2Idx:         Int,
-        val leftVisLandmarks:  List<Int>,
+        val leftVisibilityLandmarks:  List<Int>,
         // ── Angle thresholds (same for both sides) ────────────────────────────
         val s1Angle:     Float,
         val s3Angle:     Float,
@@ -259,7 +259,7 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
         landmarks:    List<Triple<Float, Float, Float>>,
         visibilities: List<Float>,
     ): Boolean {
-        if (config.rightVisLandmarks.any { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
+        if (config.rightVisibilityLandmarks.any { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
         val angle = jointAngle(landmarks, config.rightP1Idx, config.rightVertexIdx, config.rightP2Idx)
             ?: return false
 
@@ -277,9 +277,20 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
         landmarks:    List<Triple<Float, Float, Float>>,
         visibilities: List<Float>,
     ): Boolean {
-        // Both sides must have all key landmarks visible to process the frame.
-        if (config.rightVisLandmarks.any { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
-        if (config.leftVisLandmarks.any  { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
+        // [Bug A 修复前] 原始逻辑：双侧所有关键关节（含手腕）均需可见才推进状态机。
+        // 问题：肩上推举/侧平举到达动作顶点时，手腕常超出画面边缘（visibility→0），
+        // 导致双侧状态机在 S3 阈值附近全部冻结，hasVisitedS3 永远不会被置 true，rep 无法计数。
+        // 如需回滚，取消注释下方两行并删除 Bug A 修复块。
+        // if (config.rightVisibilityLandmarks.any { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
+        // if (config.leftVisibilityLandmarks.any  { visibilities[it] < VISIBILITY_IN_FRAME_MIN }) return false
+
+        // [Bug A 修复] 仅要求双侧 VERTEX 关节（肩上推举的肘、侧平举的肩）可见即可推进。
+        // 手腕离框时 MediaPipe 仍会外推其坐标位置，用于角度计算精度足够（误差 <5°），
+        // 不应因手腕离框而冻结整个状态机。
+        // 如需回滚，删除这4行并恢复上方注释掉的两行。
+        val rightVertexVisible = visibilities[config.rightVertexIdx] >= VISIBILITY_IN_FRAME_MIN
+        val leftVertexVisible  = visibilities[config.leftVertexIdx]  >= VISIBILITY_IN_FRAME_MIN
+        if (!rightVertexVisible || !leftVertexVisible) return false
 
         val rightAngle = jointAngle(landmarks, config.rightP1Idx, config.rightVertexIdx, config.rightP2Idx)
             ?: return false
@@ -368,11 +379,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_KNEE,
                 rightP2Idx        = LANDMARK_RIGHT_ANKLE,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
                 leftP1Idx         = LANDMARK_RIGHT_HIP,     // unused (unilateral)
                 leftVertexIdx     = LANDMARK_RIGHT_KNEE,    // unused (unilateral)
                 leftP2Idx         = LANDMARK_RIGHT_ANKLE,   // unused (unilateral)
-                leftVisLandmarks  = emptyList(),
+                leftVisibilityLandmarks  = emptyList(),
                 s1Angle           = SQUAT_S1_ANGLE,
                 s3Angle           = SQUAT_S3_ANGLE,
                 s3HasLarger       = false,
@@ -394,11 +405,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_KNEE,
                 rightP2Idx        = LANDMARK_RIGHT_ANKLE,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
                 leftP1Idx         = LANDMARK_RIGHT_HIP,     // unused (unilateral)
                 leftVertexIdx     = LANDMARK_RIGHT_KNEE,    // unused (unilateral)
                 leftP2Idx         = LANDMARK_RIGHT_ANKLE,   // unused (unilateral)
-                leftVisLandmarks  = emptyList(),
+                leftVisibilityLandmarks  = emptyList(),
                 s1Angle           = LUNGE_S1_ANGLE,
                 s3Angle           = LUNGE_S3_ANGLE,
                 s3HasLarger       = false,
@@ -420,11 +431,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_WRIST,
                 rightVertexIdx    = LANDMARK_RIGHT_ELBOW,
                 rightP2Idx        = LANDMARK_RIGHT_SHOULDER,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER),
                 leftP1Idx         = LANDMARK_RIGHT_WRIST,     // unused (unilateral)
                 leftVertexIdx     = LANDMARK_RIGHT_ELBOW,     // unused (unilateral)
                 leftP2Idx         = LANDMARK_RIGHT_SHOULDER,  // unused (unilateral)
-                leftVisLandmarks  = emptyList(),
+                leftVisibilityLandmarks  = emptyList(),
                 s1Angle           = BICEP_CURL_S1_ANGLE,
                 s3Angle           = BICEP_CURL_S3_ANGLE,
                 s3HasLarger       = false,
@@ -453,11 +464,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_WRIST,
                 rightVertexIdx    = LANDMARK_RIGHT_ELBOW,
                 rightP2Idx        = LANDMARK_RIGHT_SHOULDER,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER),
                 leftP1Idx         = LANDMARK_LEFT_WRIST,
                 leftVertexIdx     = LANDMARK_LEFT_ELBOW,
                 leftP2Idx         = LANDMARK_LEFT_SHOULDER,
-                leftVisLandmarks  = listOf(LANDMARK_LEFT_WRIST, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_SHOULDER),
+                leftVisibilityLandmarks  = listOf(LANDMARK_LEFT_WRIST, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_SHOULDER),
                 s1Angle           = SHOULDER_PRESS_S1_ANGLE,
                 s3Angle           = SHOULDER_PRESS_S3_ANGLE,
                 s3HasLarger       = true,
@@ -482,11 +493,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_SHOULDER,
                 rightP2Idx        = LANDMARK_RIGHT_WRIST,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_SHOULDER, LANDMARK_RIGHT_WRIST),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_SHOULDER, LANDMARK_RIGHT_WRIST),
                 leftP1Idx         = LANDMARK_LEFT_HIP,
                 leftVertexIdx     = LANDMARK_LEFT_SHOULDER,
                 leftP2Idx         = LANDMARK_LEFT_WRIST,
-                leftVisLandmarks  = listOf(LANDMARK_LEFT_HIP, LANDMARK_LEFT_SHOULDER, LANDMARK_LEFT_WRIST),
+                leftVisibilityLandmarks  = listOf(LANDMARK_LEFT_HIP, LANDMARK_LEFT_SHOULDER, LANDMARK_LEFT_WRIST),
                 s1Angle           = LATERAL_RAISE_S1_ANGLE,
                 s3Angle           = LATERAL_RAISE_S3_ANGLE,
                 s3HasLarger       = true,
@@ -498,11 +509,11 @@ class CountRepsUseCase(private val exerciseId: String = "squat") {
                 rightP1Idx        = LANDMARK_RIGHT_HIP,
                 rightVertexIdx    = LANDMARK_RIGHT_KNEE,
                 rightP2Idx        = LANDMARK_RIGHT_ANKLE,
-                rightVisLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
+                rightVisibilityLandmarks = listOf(LANDMARK_RIGHT_HIP, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE),
                 leftP1Idx         = LANDMARK_RIGHT_HIP,
                 leftVertexIdx     = LANDMARK_RIGHT_KNEE,
                 leftP2Idx         = LANDMARK_RIGHT_ANKLE,
-                leftVisLandmarks  = emptyList(),
+                leftVisibilityLandmarks  = emptyList(),
                 s1Angle           = SQUAT_S1_ANGLE,
                 s3Angle           = SQUAT_S3_ANGLE,
                 s3HasLarger       = false,
