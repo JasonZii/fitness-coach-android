@@ -582,9 +582,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
         val normalized = normalizeLandmarks(poseResult.landmarks)
         userSequence.add(normalized)
         // 滑动窗口：保持 DTW 计算量为 O(MAX_USER_SEQUENCE_FRAMES × 参考序列长度)
-        while (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
-            userSequence.removeAt(0)
-        }
+//        while (userSequence.size > MAX_USER_SEQUENCE_FRAMES) {
+//            userSequence.removeAt(0)
+//        }
 
         // ── Module 2：OE-DTW 对齐 + 轻量局部跟踪 [D3] ───────────────────────────
         val shouldRunFullDtw =
