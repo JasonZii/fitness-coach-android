@@ -89,7 +89,8 @@ fun AppNavGraph(
             val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
             TrainingScreen(
                 navController = navController,
-                exerciseId    = exerciseId
+                exerciseId    = exerciseId,
+                userViewModel = userViewModel
             )
         }
         composable(Routes.TRAINING_RESULT_TEMPLATE) { backStackEntry ->
@@ -124,7 +125,7 @@ fun AppNavGraph(
             ExerciseDetailScreen(navController, exerciseId)
         }
         composable(Routes.RECORD_LIST) {
-            RecordListScreen(navController)
+            RecordListScreen(navController, userViewModel)
         }
         composable("${Routes.RECORD_DETAIL}/{recordId}") { backStackEntry ->
             val recordId = backStackEntry.arguments?.getString("recordId")?.toIntOrNull() ?: 0
@@ -138,7 +139,8 @@ fun AppNavGraph(
 
             TrainingScreen(
                 navController = navController,
-                exerciseId = exerciseId
+                exerciseId = exerciseId,
+                userViewModel = userViewModel
             )
         }
 

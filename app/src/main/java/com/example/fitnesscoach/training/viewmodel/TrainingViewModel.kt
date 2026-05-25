@@ -55,6 +55,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
 import com.example.fitnesscoach.training.pose.PoseFrameProcessor
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -190,6 +191,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     @Volatile private var lastMatchedReferenceIndex = -1     // 上一帧 DTW 匹配索引，用于 stabilise 平滑
     private var dtwFrameCounter = 0                          // 控制完整 DTW 频率；中间帧走局部搜索
     private val smoothedSegmentLengths = mutableMapOf<Pair<Int, Int>, Float>()
+    @Volatile private var trainingStartedAtMs: Long? = null
 
     // ══════════════════════════════════════════════════════════════════════════
     // A5：参考序列数据
@@ -264,6 +266,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             lastMatchedReferenceIndex      = -1
             dtwFrameCounter                = 0
             cameraDirectionMismatchSinceMs = null
+            trainingStartedAtMs            = null
         }
 
         // IO 线程读取 JSON 并归一化，完成后切回主线程写入 @Volatile 变量
@@ -379,7 +382,13 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             lastMatchedReferenceIndex      = -1
             dtwFrameCounter                = 0
             cameraDirectionMismatchSinceMs = null
+            trainingStartedAtMs            = null
         }
+    }
+
+    fun getTrainingDurationSeconds(nowMs: Long = System.currentTimeMillis()): Long {
+        val startedAt = trainingStartedAtMs ?: return 0L
+        return max(0L, (nowMs - startedAt) / 1000L)
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -418,6 +427,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // 阶段转换时通知 endDetector 记录基准肩宽（用于"太近"检测）
         if (nextPhase == SessionPhase.TRAINING) {
+            if (trainingStartedAtMs == null) {
+                trainingStartedAtMs = System.currentTimeMillis()
+            }
             endDetector.onTrainingStart(poseResult.landmarks, requiredCameraAngle)
         }
 

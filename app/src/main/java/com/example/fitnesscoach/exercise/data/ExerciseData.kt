@@ -39,16 +39,9 @@ val exerciseList = listOf(
         id = "squat",
         title = "Squat",
         description = """
-        How to Perform a Proper Squat:
-        Stand with your feet shoulder-width apart and your toes pointing slightly outward.
-        Keep your chest up and your back straight.
-        Slowly bend your knees and push your hips back as if you are sitting on a chair.
-        Lower yourself until your thighs are parallel to the floor, or as low as you can go comfortably.
-        Keep your knees aligned with your toes and avoid letting them cave inward.
-        Push through your heels to return to the starting position.
-        Breathe in as you go down, and exhale as you come up.
-        Tip:
-        Don't lean forward too much, and keep your weight on your heels to protect your knees.
+        Stand with your feet shoulder-width apart, chest lifted, and core engaged.
+        Push your hips back, bend your knees, then drive through your heels to stand.
+        Keep your knees aligned with your toes throughout the movement.
         """.trimIndent(),
         imageRes = R.drawable.squat,
         videoRes = R.raw.squat,
@@ -63,16 +56,9 @@ val exerciseList = listOf(
         id = "lateral_raise",
         title = "Lateral Raise",
         description = """
-        How to Perform a Lateral Raise:
-        Stand upright with a dumbbell in each hand at your sides.
-        Keep your back straight and core engaged.
-        Raise both arms out to the sides until they reach shoulder height.
-        Keep a slight bend in your elbows.
-        Pause briefly at the top.
-        Slowly lower the dumbbells back to the starting position.
-
-        Tip:
-        Avoid swinging your body. Use controlled movement to target your shoulders.
+        Stand tall with dumbbells at your sides and a slight bend in your elbows.
+        Raise both arms to shoulder height, then lower them with control.
+        Avoid swinging your torso so the shoulders do the work.
         """.trimIndent(),
         imageRes = R.drawable.lateral_raise,
         videoRes = R.raw.lateral_raise,
@@ -81,22 +67,15 @@ val exerciseList = listOf(
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
         keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
-        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
+        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
     ),
     ExerciseInfo(
         id = "bicep_curl",
         title = "Bicep Curl",
         description = """
-        How to Perform a Bicep Curl:
-        Stand upright with a dumbbell in each hand, arms fully extended at your sides.
-        Keep your elbows close to your torso and your palms facing forward.
-        Slowly curl the dumbbells upward by contracting your biceps.
-        Continue raising until the dumbbells are at shoulder level.
-        Pause briefly at the top, then slowly lower the dumbbells back to the starting position.
-
-        Tip:
-        Keep your upper arms stationary throughout the movement. Only your forearms should move.
-        Avoid swinging your body to lift the weight.
+        Stand upright with your elbows close to your sides and palms facing forward.
+        Curl the dumbbells toward your shoulders, then lower them slowly.
+        Keep your upper arms still and avoid using body momentum.
         """.trimIndent(),
         imageRes = R.drawable.bicep_curl,
         videoRes = R.raw.bicep_curl,
@@ -111,16 +90,9 @@ val exerciseList = listOf(
         id = "lunge_knee_raise",
         title = "Lunge Knee Raise",
         description = """
-        How to Perform a Lunge Knee Raise:
-        Stand upright with feet together.
-        Step forward with your right leg into a lunge position.
-        Lower your body until both knees are bent at about 90 degrees.
-        Push through your right heel to stand up.
-        As you rise, bring your right knee up toward your chest.
-        Return to the starting position and repeat.
-
-        Tip:
-        Keep your balance and engage your core throughout the movement.
+        Step forward into a lunge, keeping your torso tall and core steady.
+        Push through the front heel to stand and lift the working knee upward.
+        Move with control so your balance stays stable.
         """.trimIndent(),
         imageRes = R.drawable.lunge_knee_raise,
         videoRes = R.raw.lunge_knee_raise,
@@ -135,15 +107,9 @@ val exerciseList = listOf(
         id = "shoulder_press",
         title = "Shoulder Press",
         description = """
-        How to Perform a Shoulder Press:
-        Stand with a dumbbell in each hand at shoulder height.
-        Keep your palms facing forward.
-        Press the dumbbells upward until your arms are fully extended.
-        Pause briefly at the top.
-        Slowly lower the dumbbells back to shoulder level.
-
-        Tip:
-        Avoid arching your back. Keep your core tight and stable.
+        Hold dumbbells at shoulder height with your core braced.
+        Press upward until your arms extend, then lower back to shoulder level.
+        Keep your ribs down and avoid arching your lower back.
         """.trimIndent(),
         imageRes = R.drawable.shoulder_press,
         videoRes = R.raw.shoulder_press,
@@ -152,6 +118,6 @@ val exerciseList = listOf(
         requiresFullBody = false,
         requiredSideViewDirection = SideViewDirection.NONE,
         keyBodyParts = setOf(KeyBodyPart.SHOULDERS, KeyBodyPart.ELBOWS, KeyBodyPart.WRISTS),
-        readinessVisibilityMode = ReadinessVisibilityMode.ANY_VISIBLE_SIDE,
+        readinessVisibilityMode = ReadinessVisibilityMode.BOTH_VISIBLE_SIDES,
     ),
 )
