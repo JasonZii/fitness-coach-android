@@ -32,11 +32,13 @@ import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
 import kotlinx.coroutines.withContext
 import com.example.fitnesscoach.exercise.data.exerciseList
+import com.example.fitnesscoach.user.viewmodel.UserViewModel
 
 @Composable
 fun TrainingScreen(
     navController: NavHostController,
     exerciseId: String = "squat",
+    userViewModel: UserViewModel,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -116,6 +118,15 @@ fun TrainingScreen(
                         uiState.repScores.average().toInt() else 0
                     val correctReps   = uiState.correctReps
                     val incorrectReps = uiState.incorrectReps
+                    val durationSeconds = viewModel.getTrainingDurationSeconds()
+                    val ownerName = if (
+                        userViewModel.isLoggedIn &&
+                        userViewModel.username.isNotBlank()
+                    ) {
+                        userViewModel.username
+                    } else {
+                        "Guest"
+                    }
 
                     viewModel.stopTraining()
 
@@ -126,12 +137,14 @@ fun TrainingScreen(
                     scope.launch(Dispatchers.IO) {
                         val newRecordId = dao.insertRecord(
                             TrainingRecordEntity(
+                                ownerName = ownerName,
                                 exerciseId = exerciseId,
                                 exerciseName = exerciseName,
                                 repCount = repCount,
                                 avgScore = avgScore,
                                 correctReps = correctReps,
-                                incorrectReps = incorrectReps
+                                incorrectReps = incorrectReps,
+                                durationSeconds = durationSeconds
                             )
                         ).toInt()
 

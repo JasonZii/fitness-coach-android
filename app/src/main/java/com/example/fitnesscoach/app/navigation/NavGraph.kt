@@ -72,10 +72,11 @@ fun AppNavGraph(
 ) {
     NavHost(
         navController = navController,
-        startDestination = Routes.HOME
+        startDestination = Routes.HOME,
+        modifier = modifier
     ) {
         composable(Routes.HOME) {
-            HomeScreen(navController)
+            HomeScreen(navController, userViewModel)
         }
         composable(Routes.USER) {
             if (userViewModel.isLoggedIn) {
@@ -89,7 +90,7 @@ fun AppNavGraph(
             TrainingScreen(
                 navController = navController,
                 exerciseId    = exerciseId,
-                modifier      = modifier
+                userViewModel = userViewModel
             )
         }
         // ResultScreen is currently unused — training navigates to RecordDetailScreen instead.
@@ -126,7 +127,7 @@ fun AppNavGraph(
             ExerciseDetailScreen(navController, exerciseId)
         }
         composable(Routes.RECORD_LIST) {
-            RecordListScreen(navController)
+            RecordListScreen(navController, userViewModel)
         }
         composable("${Routes.RECORD_DETAIL}/{recordId}") { backStackEntry ->
             val recordId = backStackEntry.arguments?.getString("recordId")?.toIntOrNull() ?: 0
@@ -135,5 +136,15 @@ fun AppNavGraph(
                 recordId = recordId
             )
         }
+        composable("${Routes.TRAINING}/{exerciseId}") { backStackEntry ->
+            val exerciseId = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
+
+            TrainingScreen(
+                navController = navController,
+                exerciseId = exerciseId,
+                userViewModel = userViewModel
+            )
+        }
+
     }
 }

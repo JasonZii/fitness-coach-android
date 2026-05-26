@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
 import com.example.fitnesscoach.training.pose.PoseFrameProcessor
 
 // 朝向不匹配多少毫秒后才显示橙色警告（宽限期，过滤瞬间转身）
@@ -160,6 +161,7 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
     @Volatile
     private var rawReferenceSequence: List<List<Triple<Float, Float, Float>>> =
         emptyList() // 原始坐标，供蓝色骨架使用
+    @Volatile private var trainingStartedAtMs: Long? = null  // 训练开始时间戳，用于计算训练时长
 
 
     // Written by TrainingScreen when the user toggles the "Blue skeleton" switch.
@@ -330,8 +332,20 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
             }
             lastMatchedReferenceIndex  = -1
             directionMismatchStartedAt = null
+            trainingStartedAtMs        = null
         }
     }
+
+    fun getTrainingDurationSeconds(nowMs: Long = System.currentTimeMillis()): Long {
+        val startedAt = trainingStartedAtMs ?: return 0L
+        return max(0L, (nowMs - startedAt) / 1000L)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // B4：onCleared()
+    // 调用方：Android 系统（ViewModel 即将销毁时自动调用）
+    // 作用：释放 MediaPipe GPU/CPU 资源；关闭算法线程执行器
+    // ══════════════════════════════════════════════════════════════════════════
 
     override fun onCleared() {
         super.onCleared()
@@ -363,6 +377,9 @@ class TrainingViewModel(application: Application) : AndroidViewModel(application
 
         // 阶段转换时通知 endDetector 记录基准肩宽（用于"太近"检测）
         if (nextPhase == SessionPhase.TRAINING) {
+            if (trainingStartedAtMs == null) {
+                trainingStartedAtMs = System.currentTimeMillis()
+            }
             endDetector.onTrainingStart(poseResult.landmarks, requiredCameraAngle)
         }
 
