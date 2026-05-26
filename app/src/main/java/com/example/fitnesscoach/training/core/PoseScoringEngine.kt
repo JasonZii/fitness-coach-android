@@ -33,14 +33,14 @@ data class PoseScoreResult(
 )
 
 object PoseScoringEngine {
-    //用来避免除以 0。
     private const val EPS = 1e-6f
+    private const val Z_WEIGHT_S1 = 0.1f
+    private const val Z_WEIGHT_S2 = 0.1f
 
     private val RED = Color.Red
     private val GREEN = Color.Green
 
-    //内部使用的二维点
-    data class Point(val x: Float, val y: Float)
+    data class Point(val x: Float, val y: Float, val z: Float)
     //这个类表示“一条肢体”.
     /*
        start 起点关节编号
@@ -57,15 +57,11 @@ object PoseScoringEngine {
     // When upperBodyOnly = true, only these are included in S2 and colour decisions.
     private val UPPER_BODY_LIMB_INDICES = setOf(0, 1, 2, 3, 4, 5, 10, 12)
     private val BICEP_CURL_LIMB_INDICES = setOf(2, 3)
-    private val SQUAT_LIMB_INDICES = setOf(4, 5, 6, 7, 8, 9, 11, 12)
-    private val LUNGE_LIMB_INDICES = setOf(4, 5, 6, 7, 8, 9, 11, 12)
 
     // Joint indices included in S1 when upperBodyOnly = true.
     // Hips (23, 24) are included because they anchor the torso limbs and spine.
     private val UPPER_BODY_JOINT_INDICES = setOf(11, 12, 13, 14, 15, 16, 23, 24)
     private val BICEP_CURL_JOINT_INDICES = setOf(12, 14, 16)
-    private val SQUAT_JOINT_INDICES = setOf(11, 12, 23, 24, 25, 26, 27, 28)
-    private val LUNGE_JOINT_INDICES = setOf(11, 12, 23, 24, 25, 26, 27, 28)
 
     // Maps each joint index to the limb indices it belongs to.
     // Joints not listed here (e.g. face, hands, feet) have no connected scored limb → always green.
@@ -111,12 +107,10 @@ object PoseScoringEngine {
      *   confuse the user with irrelevant red highlights.
      */
     fun calculatePoseScore(
-        userLandmarks: List<Pair<Float, Float>>,
-        referenceLandmarks: List<Pair<Float, Float>>,
+        userLandmarks: List<Triple<Float, Float, Float>>,
+        referenceLandmarks: List<Triple<Float, Float, Float>>,
         upperBodyOnly: Boolean = false,
         bicepCurlOnly: Boolean = false,
-        squatOnly: Boolean = false,
-        lungeOnly: Boolean = false,
     ): PoseScoreResult {
         require(userLandmarks.size == LANDMARK_COUNT) {
             "userLandmarks size must be $LANDMARK_COUNT"
@@ -125,18 +119,14 @@ object PoseScoringEngine {
             "referenceLandmarks size must be $LANDMARK_COUNT"
         }
 
-        val user = userLandmarks.map { Point(it.first, it.second) }
-        val ref = referenceLandmarks.map { Point(it.first, it.second) }
+        val user = userLandmarks.map { Point(it.first, it.second, it.third) }
+        val ref  = referenceLandmarks.map { Point(it.first, it.second, it.third) }
         val activeLimbIndices = when {
-            lungeOnly -> LUNGE_LIMB_INDICES
-            squatOnly -> SQUAT_LIMB_INDICES
             bicepCurlOnly -> BICEP_CURL_LIMB_INDICES
             upperBodyOnly -> UPPER_BODY_LIMB_INDICES
             else -> limbs.indices.toSet()
         }
         val activeJointIndices = when {
-            lungeOnly -> LUNGE_JOINT_INDICES
-            squatOnly -> SQUAT_JOINT_INDICES
             bicepCurlOnly -> BICEP_CURL_JOINT_INDICES
             upperBodyOnly -> UPPER_BODY_JOINT_INDICES
             else -> 0 until LANDMARK_COUNT
@@ -186,71 +176,61 @@ object PoseScoringEngine {
         )
     }
 
-    //计算两点距离 distance = sqrt((x1-x2)^2 + (y1-y2)^2)
-    //二维欧氏距离。 用于 Step 1 的关节位置评分
     private fun distance(a: Point, b: Point): Float {
         val dx = a.x - b.x
         val dy = a.y - b.y
-        return sqrt(dx * dx + dy * dy)
+        val dz = (a.z - b.z) * Z_WEIGHT_S1
+        return sqrt(dx * dx + dy * dy + dz * dz)
     }
 
-    //计算中点
-    //求两个点的中心位置。
-    //这里主要用于脊柱计算： 肩膀中点 髋部中点
-    private fun midpoint(a: Point, b: Point): Point {
-        return Point(
-            x = (a.x + b.x) / 2f,
-            y = (a.y + b.y) / 2f
-        )
-    }
+    private fun midpoint(a: Point, b: Point): Point = Point(
+        x = (a.x + b.x) / 2f,
+        y = (a.y + b.y) / 2f,
+        z = (a.z + b.z) / 2f,
+    )
 
-    //获得肢体向量 根据一条 limb，返回它的方向向量
     private fun getLimbVector(points: List<Point>, limb: Limb): Point {
         return if (limb.useMidpoint) {
-            //脊柱的特殊情况
-//因为脊柱不是某两个单点直接连，而是：起点：左右肩中点 终点：左右髋中点 所以要用 midpoint()。
             val shoulderMid = midpoint(points[11], points[12])
-            val hipMid = midpoint(points[23], points[24])
+            val hipMid      = midpoint(points[23], points[24])
             Point(
                 x = hipMid.x - shoulderMid.x,
-                y = hipMid.y - shoulderMid.y
+                y = hipMid.y - shoulderMid.y,
+                z = hipMid.z - shoulderMid.z,
             )
-        } else { //普通 limb 的情况 vector = end - start
+        } else {
             val start = points[limb.start]
-            val end = points[limb.end]
+            val end   = points[limb.end]
             Point(
                 x = end.x - start.x,
-                y = end.y - start.y
+                y = end.y - start.y,
+                z = end.z - start.z,
             )
         }
     }
 
-    //计算两个向量夹角
     private fun angleBetween(a: Point, b: Point): Float {
-        //先算两个向量长度 。向量长度公式：|A| = sqrt(x² + y²)
-        val magA = sqrt(a.x * a.x + a.y * a.y)
-        val magB = sqrt(b.x * b.x + b.y * b.y)
-
-        //防止除零
+        val az = a.z * Z_WEIGHT_S2
+        val bz = b.z * Z_WEIGHT_S2
+        val magA = sqrt(a.x * a.x + a.y * a.y + az * az)
+        val magB = sqrt(b.x * b.x + b.y * b.y + bz * bz)
         if (magA < EPS || magB < EPS) return 0f
-
-        //算点积 。A·B = AxBx + AyBy
-        val dot = a.x * b.x + a.y * b.y
-        //算余弦值 。cosθ = (A·B) / (|A||B|) coerceIn(-1f, 1f) 是为了防止浮点误差导致 acos() 出现非法值。
+        val dot    = a.x * b.x + a.y * b.y + az * bz
         val cosine = (dot / (magA * magB)).coerceIn(-1f, 1f)
-        //最后转成角度 0° ~ 180°
         return Math.toDegrees(acos(cosine).toDouble()).toFloat()
     }
 
-    //test
-    fun testPoseScoring() {
-        val ref = List(33) { Pair(0.5f, 0.5f) }
-        val user = List(33) { Pair(0.5f, 0.5f) }
-
-        val result = PoseScoringEngine.calculatePoseScore(user, ref)
-
-        println("S1 = ${result.s1}")
-        println("S2 = ${result.s2}")
-        println("Sf = ${result.sf}")
+    /**
+     * Computes visual joint colors driven by [visualLimbIsRed] (per-limb display flags from
+     * RepScoreTracker) rather than raw limb scores. A joint is red only when at least one of
+     * its connected limbs has been persistently red beyond the display threshold.
+     */
+    fun computeVisualJointColors(
+        visualLimbIsRed: BooleanArray,
+    ): List<Color> = (0 until LANDMARK_COUNT).map { jointIdx ->
+        val connectedLimbs = JOINT_LIMB_MAP[jointIdx]
+        if (connectedLimbs != null && connectedLimbs.any { limbIdx ->
+                limbIdx < visualLimbIsRed.size && visualLimbIsRed[limbIdx]
+            }) RED else GREEN
     }
 }

@@ -93,21 +93,23 @@ fun AppNavGraph(
                 userViewModel = userViewModel
             )
         }
-        composable(Routes.TRAINING_RESULT_TEMPLATE) { backStackEntry ->
-            val exerciseId    = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
-            val repCount      = backStackEntry.arguments?.getString("repCount")?.toIntOrNull() ?: 0
-            val avgScore      = backStackEntry.arguments?.getString("avgScore")?.toIntOrNull() ?: 0
-            val correctReps   = backStackEntry.arguments?.getString("correctReps")?.toIntOrNull() ?: 0
-            val incorrectReps = backStackEntry.arguments?.getString("incorrectReps")?.toIntOrNull() ?: 0
-            ResultScreen(
-                navController = navController,
-                exerciseId    = exerciseId,
-                repCount      = repCount,
-                avgScore      = avgScore,
-                correctReps   = correctReps,
-                incorrectReps = incorrectReps,
-            )
-        }
+        // ResultScreen is currently unused — training navigates to RecordDetailScreen instead.
+        // Kept for potential future use.
+        // composable(Routes.TRAINING_RESULT_TEMPLATE) { backStackEntry ->
+        //     val exerciseId    = backStackEntry.arguments?.getString("exerciseId") ?: "squat"
+        //     val repCount      = backStackEntry.arguments?.getString("repCount")?.toIntOrNull() ?: 0
+        //     val avgScore      = backStackEntry.arguments?.getString("avgScore")?.toIntOrNull() ?: 0
+        //     val correctReps   = backStackEntry.arguments?.getString("correctReps")?.toIntOrNull() ?: 0
+        //     val incorrectReps = backStackEntry.arguments?.getString("incorrectReps")?.toIntOrNull() ?: 0
+        //     ResultScreen(
+        //         navController = navController,
+        //         exerciseId    = exerciseId,
+        //         repCount      = repCount,
+        //         avgScore      = avgScore,
+        //         correctReps   = correctReps,
+        //         incorrectReps = incorrectReps,
+        //     )
+        // }
         composable(Routes.RECORD) {
             RecordScreen(navController)
         }

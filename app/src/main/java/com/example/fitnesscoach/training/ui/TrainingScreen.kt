@@ -22,6 +22,7 @@ import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.training.pose.CameraAngle
 import com.example.fitnesscoach.training.pose.ReadinessPhase
+import com.example.fitnesscoach.training.pose.SideViewDirection
 import com.example.fitnesscoach.training.viewmodel.SessionPhase
 import com.example.fitnesscoach.training.viewmodel.TrainingUiState
 import com.example.fitnesscoach.training.viewmodel.TrainingViewModel
@@ -161,22 +162,27 @@ fun TrainingScreen(
 
         ReferenceSkeletonSwitch(
             checked = showReferenceSkeleton,
-            onCheckedChange = { showReferenceSkeleton = it },
+            onCheckedChange = {
+                showReferenceSkeleton = it
+                viewModel.showRefSkeleton = it
+            },
             modifier = Modifier.align(Alignment.TopEnd)
         )
 
         // ── Layer 5: pause banner (on top of everything) ──────────────────────
         if (uiState.isTrainingPaused) {
             val pauseMessage = when {
-                !uiState.isFullBodyInFrame ->
-                    "Training paused: please keep your full body in the frame."
+                !uiState.isBodyInFrame ->
+                    "Training paused: please keep your body in the frame."
                 uiState.cameraAngle != uiState.requiredCameraAngle ->
                     "Training paused: please adjust your camera angle."
-                else -> "Paused — move back or ensure full body is visible"
+                else -> "Paused — please step back or improve lighting"
             }
             PauseBanner(
                 text = pauseMessage,
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(horizontal = 16.dp),
             )
         }
     }
@@ -190,26 +196,31 @@ private fun ReferenceSkeletonSwitch(
 ) {
     Row(
         modifier = modifier
-            .padding(16.dp)
-            .background(
-                Color.Black.copy(alpha = 0.55f),
-                RoundedCornerShape(10.dp)
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .statusBarsPadding()
+            .padding(top = 72.dp, end = 16.dp)
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "Blue",
-            color = Color.White,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            text = "Blue skeleton",
+            color = Color(0xFFB0B0B0),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
         )
 
         Spacer(modifier = Modifier.width(8.dp))
 
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFF3D7EFF),
+                uncheckedThumbColor = Color(0xFF8A8A8A),
+                uncheckedTrackColor = Color(0xFF3A3A3C),
+                uncheckedBorderColor = Color.Transparent,
+            )
         )
     }
 }
@@ -238,13 +249,13 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
 
                     // ── Camera-angle status ───────────────────────────────────
                     val angleInstruction = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
-                        "Please adjust your camera angle."
+                        "Please turn side-on to the camera."
                     else
-                        "Please adjust your camera angle."
+                        "Please face the camera directly."
                     val angleReadyText = if (uiState.requiredCameraAngle == CameraAngle.SIDE)
-                        "Side-on direction matches the reference video"
+                        "Side-on — correct angle"
                     else
-                        "Angle correct — $angleInstruction"
+                        "Facing camera — correct angle"
                     val angleMatched = uiState.cameraAngle == uiState.requiredCameraAngle
                     ReadinessCheckRow(
                         satisfied = angleMatched,
@@ -257,10 +268,25 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
                     // ── Full-body visibility status ───────────────────────────
                     if (uiState.requiresFullBody) {
                         ReadinessCheckRow(
-                            satisfied       = uiState.isFullBodyInFrame,
+                            satisfied       = uiState.isBodyInFrame,
                             satisfiedText   = "Body landmarks visible",
-                            unsatisfiedText = "Please keep your full body in the frame.",
+                            unsatisfiedText = "Please keep your body in the frame.",
                             unsatisfiedColor = Color(0xFFFF6B6B),   // red – more urgent
+                        )
+                    }
+
+                    // ── Side-view direction status ────────────────────────────
+                    if (uiState.requiredCameraAngle == CameraAngle.SIDE &&
+                        uiState.requiredSideViewDirection != SideViewDirection.NONE) {
+                        Spacer(Modifier.height(6.dp))
+                        val dirLabel = if (uiState.requiredSideViewDirection == SideViewDirection.LEFT)
+                            "left" else "right"
+                        val directionMatched =
+                            uiState.sideViewDirection == uiState.requiredSideViewDirection
+                        ReadinessCheckRow(
+                            satisfied       = directionMatched,
+                            satisfiedText   = "Facing $dirLabel — correct direction",
+                            unsatisfiedText = "Please face to the $dirLabel.",
                         )
                     }
                 }
@@ -305,18 +331,27 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
 
         // Top-left HUD: rep count
-        Box(
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp)
-                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+                .statusBarsPadding()
+                .padding(top = 72.dp, start = 16.dp)
+                .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
+                .padding(horizontal = 18.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "Reps: ${uiState.repCount}",
+                text = "${uiState.repCount}",
                 color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "REPS",
+                color = Color(0xFFB0B0B0),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.5.sp,
             )
         }
 
@@ -324,7 +359,7 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 72.dp, start = 16.dp, end = 16.dp)
+                    .padding(top = 148.dp, start = 16.dp, end = 16.dp)
                     .fillMaxWidth()
                     .background(Color(0xFFFF6F00).copy(alpha = 0.9f), RoundedCornerShape(10.dp))
                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -358,21 +393,29 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
 
 @Composable
 private fun PauseBanner(
-    text: String = "Paused — move back or ensure full body is visible",
+    text: String = "Paused — ensure full body is visible",
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Row(
         modifier = modifier
+            .statusBarsPadding()
+            .padding(top = 10.dp)
             .fillMaxWidth()
-            .background(Color(0xFFFF6F00).copy(alpha = 0.9f))
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.93f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .background(Color(0xFFFFB300), RoundedCornerShape(5.dp))
+        )
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = text,
             color = Color.White,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
         )
     }
 }

@@ -33,7 +33,7 @@ class PipelineIntegrationTest {
     fun fullPipeline_squatJson_warmupAndAlignmentAndScoring() {
         // ── Build reference sequence ──────────────────────────────────────────
         val rawFrames        = parseReferencePoseJson(loadSquatJson())
-        val referenceSequence = rawFrames.map { normalizeLandmarks(it) }
+        val referenceSequence = rawFrames.mapNotNull { normalizeLandmarks(it) }
 
         val evaluateUseCase  = EvaluateExerciseUseCase()
         val userSequence     = mutableListOf<List<Triple<Float, Float, Float>>>()
@@ -43,7 +43,7 @@ class PipelineIntegrationTest {
 
         // ── Simulate per-frame processing ─────────────────────────────────────
         rawFrames.forEachIndexed { frameIdx, rawFrame ->
-            val normalized = normalizeLandmarks(rawFrame)
+            val normalized = normalizeLandmarks(rawFrame) ?: return@forEachIndexed
             userSequence.add(normalized)
 
             val matchedIdx  = alignOeDtw(userSequence, referenceSequence)

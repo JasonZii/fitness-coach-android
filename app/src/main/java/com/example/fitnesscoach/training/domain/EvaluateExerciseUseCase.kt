@@ -10,8 +10,8 @@ import com.example.fitnesscoach.training.core.PoseScoringEngine
  * Evaluates a single live frame against the matched standard frame.
  *
  * Wraps [PoseScoringEngine.calculatePoseScore] and handles the OE-DTW unstable
- * period: when [matchedReferenceIndex] is -1 (fewer than 20 user frames), all
- * joints and limbs are returned as green per ALGORITHM.md §Module 2.
+ * period: when [matchedReferenceIndex] is -1 (fewer than [OE_DTW_MIN_FRAMES] user frames),
+ * all joints and limbs are returned as green.
  */
 class EvaluateExerciseUseCase {
 
@@ -46,12 +46,10 @@ class EvaluateExerciseUseCase {
         if (matchedReferenceIndex == -1) return allGreenResult
         val referenceLandmarks = referenceSequence[matchedReferenceIndex]
         return PoseScoringEngine.calculatePoseScore(
-            userLandmarks.map { it.first to it.second },
-            referenceLandmarks.map { it.first to it.second },
+            userLandmarks,
+            referenceLandmarks,
             upperBodyOnly,
             bicepCurlOnly = exerciseId == "bicep_curl",
-            squatOnly = exerciseId == "squat",
-            lungeOnly = exerciseId == "lunge_knee_raise"
         )
     }
 }

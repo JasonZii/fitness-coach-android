@@ -7,6 +7,23 @@ import org.junit.Test
 import kotlin.math.abs
 import kotlin.random.Random
 
+// ── advanceOeDtw helpers ──────────────────────────────────────────────────────
+
+/** Feed [userSeq] into [advanceOeDtw] one frame at a time; return final matchedReferenceIndex. */
+private fun runIncremental(
+    userSeq: List<List<Triple<Float, Float, Float>>>,
+    refSeq: List<List<Triple<Float, Float, Float>>>,
+): Int {
+    var row: FloatArray? = null
+    var matched = -1
+    for ((i, frame) in userSeq.withIndex()) {
+        val r = advanceOeDtw(frame, refSeq, row, i + 1)
+        row = r.nextRow
+        matched = r.matchedReferenceIndex
+    }
+    return matched
+}
+
 /**
  * Unit tests for [alignOeDtw].
  *
@@ -182,5 +199,98 @@ class AlignOeDtwTest {
             "matchedReferenceIndex must be < referenceSequence.size, got $result",
             result < ref.size
         )
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // advanceOeDtw() — incremental API tests
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // ── AC-2 incremental: warm-up guard ──────────────────────────────────────
+
+    @Test
+    fun incremental_returnsMinusOneDuringWarmup() {
+        val ref = buildSequence(30)
+        for (size in 1 until OE_DTW_MIN_FRAMES) {
+            val result = runIncremental(buildSequence(size, seed = size.toLong()), ref)
+            assertEquals(
+                "Expected -1 for frameCount=$size (< $OE_DTW_MIN_FRAMES), got $result",
+                -1, result
+            )
+        }
+    }
+
+    @Test
+    fun incremental_returnsNonNegativeAtMinFrames() {
+        val seq = buildSequence(OE_DTW_MIN_FRAMES)
+        val result = runIncremental(seq, seq)
+        assertTrue("Expected >= 0 at frameCount=$OE_DTW_MIN_FRAMES, got $result", result >= 0)
+    }
+
+    // ── AC-1 incremental: identical sequences ─────────────────────────────────
+
+    @Test
+    fun incremental_identicalSequencesMatchAtLastIndex() {
+        val seq = buildSequence(30)
+        val result = runIncremental(seq, seq)
+        assertEquals(
+            "Identical sequences (length 30): expected matchedReferenceIndex=${seq.size - 1}",
+            seq.size - 1, result
+        )
+    }
+
+    @Test
+    fun incremental_identicalSequencesMatchAtLastIndexMinLength() {
+        val seq = buildSequence(OE_DTW_MIN_FRAMES)
+        val result = runIncremental(seq, seq)
+        assertEquals(
+            "Identical sequences (length $OE_DTW_MIN_FRAMES): expected matchedReferenceIndex=${seq.size - 1}",
+            seq.size - 1, result
+        )
+    }
+
+    // ── Equivalence: incremental == batch for arbitrary inputs ───────────────
+
+    @Test
+    fun incremental_matchesBatchForArbitraryInputs() {
+        val ref = buildSequence(60)
+        for ((size, seed) in listOf(OE_DTW_MIN_FRAMES to 7L, 25 to 13L, 40 to 99L, 55 to 42L)) {
+            val user = buildSequence(size, seed)
+            val batch = alignOeDtw(user, ref)
+            val incr  = runIncremental(user, ref)
+            assertEquals(
+                "Batch and incremental must agree for size=$size seed=$seed",
+                batch, incr
+            )
+        }
+    }
+
+    // ── Reset semantics: null prevRow re-initialises correctly ────────────────
+
+    @Test
+    fun incremental_resetStartsFresh() {
+        val ref = buildSequence(40)
+        val seq = buildSequence(OE_DTW_MIN_FRAMES + 5)
+
+        // First pass
+        val firstResult = runIncremental(seq, ref)
+
+        // Simulate rep reset: feed the SAME frames again from null
+        val secondResult = runIncremental(seq, ref)
+
+        assertEquals(
+            "Two identical runs after reset must produce identical results",
+            firstResult, secondResult
+        )
+    }
+
+    // ── Valid index bounds for incremental ────────────────────────────────────
+
+    @Test
+    fun incremental_resultIsAlwaysValidReferenceIndex() {
+        val ref = buildSequence(50)
+        val user = buildSequence(25, seed = 77L)
+        val result = runIncremental(user, ref)
+        assertTrue("matchedReferenceIndex must be >= 0, got $result", result >= 0)
+        assertTrue("matchedReferenceIndex must be < ref.size, got $result", result < ref.size)
     }
 }

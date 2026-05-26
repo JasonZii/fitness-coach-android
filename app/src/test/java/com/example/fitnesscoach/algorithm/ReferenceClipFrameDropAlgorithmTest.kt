@@ -169,7 +169,7 @@ class ReferenceClipFrameDropAlgorithmTest {
             .getResourceAsStream("landmarks/${fixture.landmarkJson}")!!
             .bufferedReader()
             .readText()
-        return parseReferencePoseJson(json, step = fixture.parseStep).map { normalizeLandmarks(it) }
+        return parseReferencePoseJson(json, step = fixture.parseStep).mapNotNull { normalizeLandmarks(it) }
     }
 
     private fun writeReports(rows: List<ChartRow>) {

@@ -2,18 +2,14 @@ package com.example.fitnesscoach.training.pose
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.example.fitnesscoach.core.mediapipe.PoseLandmarkerHelper
 import com.example.fitnesscoach.core.mediapipe.PoseResult
-import java.io.ByteArrayOutputStream
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
 
 // Joints to draw (upper-body + lower-body key joints).
 private val DRAWN_JOINT_INDICES = setOf(11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28)
@@ -40,10 +36,9 @@ class PoseFrameProcessor(context: Context) {
     private val appContext = context.applicationContext
     private var poseLandmarkerHelper: PoseLandmarkerHelper? = null
 
-    // Latest scoring colours from the algorithm dispatcher (previous frame).
+    // Latest scoring colours and reference landmarks from the algorithm dispatcher (previous frame).
     // Written by TrainingViewModel; read here when drawing on the bitmap.
-    // Replacing the array reference atomically with @Volatile is sufficient
-    // because we never mutate in-place.
+    // Replacing the reference atomically with @Volatile is sufficient because we never mutate in-place.
     @Volatile private var latestJointArgbColors: IntArray =
         IntArray(33) { android.graphics.Color.GREEN }
     @Volatile private var latestLimbArgbColors: IntArray =
@@ -53,9 +48,15 @@ class PoseFrameProcessor(context: Context) {
 
     /**
      * Called by TrainingViewModel (on algorithmDispatcher) after each scoring frame.
-     * Updates the colours used the NEXT time drawSkeletonOnBitmap() runs.
+     * Updates the reference landmarks and colours used the NEXT time drawSkeletonOnBitmap() runs.
+     * Pass [refLandmarks] as emptyList() to suppress the blue skeleton for that frame.
      */
-    fun updateColors(jointArgbColors: IntArray, limbArgbColors: IntArray) {
+    fun updateReferenceAndColors(
+        refLandmarks: List<Triple<Float, Float, Float>>,
+        jointArgbColors: IntArray,
+        limbArgbColors: IntArray,
+    ) {
+        latestReferenceLandmarks = refLandmarks
         latestJointArgbColors = jointArgbColors
         latestLimbArgbColors  = limbArgbColors
     }
@@ -155,19 +156,26 @@ class PoseFrameProcessor(context: Context) {
             limbPaint.color = REFERENCE_BLUE_ARGB
             LIMB_PAIRS.forEach { (s, e) ->
                 if (s == -1) {
-                    canvas.drawLine(
-                        (refPx(11) + refPx(12)) / 2f, (refPy(11) + refPy(12)) / 2f,
-                        (refPx(23) + refPx(24)) / 2f, (refPy(23) + refPy(24)) / 2f,
-                        limbPaint
-                    )
+                    if (vis(11) >= VISIBILITY_THRESHOLD && vis(12) >= VISIBILITY_THRESHOLD &&
+                        vis(23) >= VISIBILITY_THRESHOLD && vis(24) >= VISIBILITY_THRESHOLD) {
+                        canvas.drawLine(
+                            (refPx(11) + refPx(12)) / 2f, (refPy(11) + refPy(12)) / 2f,
+                            (refPx(23) + refPx(24)) / 2f, (refPy(23) + refPy(24)) / 2f,
+                            limbPaint
+                        )
+                    }
                 } else {
-                    canvas.drawLine(refPx(s), refPy(s), refPx(e), refPy(e), limbPaint)
+                    if (vis(s) >= VISIBILITY_THRESHOLD && vis(e) >= VISIBILITY_THRESHOLD) {
+                        canvas.drawLine(refPx(s), refPy(s), refPx(e), refPy(e), limbPaint)
+                    }
                 }
             }
 
             jointPaint.color = REFERENCE_BLUE_ARGB
             DRAWN_JOINT_INDICES.forEach { idx ->
-                canvas.drawCircle(refPx(idx), refPy(idx), JOINT_RADIUS_PX, jointPaint)
+                if (vis(idx) >= VISIBILITY_THRESHOLD) {
+                    canvas.drawCircle(refPx(idx), refPy(idx), JOINT_RADIUS_PX, jointPaint)
+                }
             }
         }
 
@@ -200,30 +208,43 @@ class PoseFrameProcessor(context: Context) {
         }
     }
 
-    // ── YUV → Bitmap conversion ────────────────────────────────────────────────
+    // ── YUV → Bitmap 转换 ────────────────────────────────────────────────
 
     private fun imageProxyToBitmap(imageProxy: ImageProxy): Bitmap {
-        val yBuffer = imageProxy.planes[0].buffer
-        val uBuffer = imageProxy.planes[1].buffer
-        val vBuffer = imageProxy.planes[2].buffer
+        // 【新实现】使用 CameraX 内置扩展函数 toBitmap() 直接将 ImageProxy 转为 ARGB_8888 Bitmap。
+        // 无需经过 JPEG 压缩/解码，避免 80% 质量 JPEG 引入的块状量化误差（约 2–4 px），
+        // 从而消除 MediaPipe 关键点检测在帧间产生的 1–3 px 级别抖动，同时减少 CPU 和 GC 开销。
+        val bitmap = imageProxy.toBitmap()
 
-        val ySize = yBuffer.remaining()
-        val uSize = uBuffer.remaining()
-        val vSize = vBuffer.remaining()
-
-        val nv21 = ByteArray(ySize + uSize + vSize)
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
-
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, imageProxy.width, imageProxy.height), 80, out)
-        val bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
+        // 【旧实现 — 保留备用，如遇设备兼容问题可取消注释以下代码并删除上方 toBitmap() 调用来恢复】
+        // 原方案通过 YuvImage + ByteArrayOutputStream 将 YUV 帧压缩为 80% 质量的 JPEG，
+        // 再用 BitmapFactory 解码回 Bitmap。这会引入二次有损压缩误差（约 2–4 px 块状伪影），
+        // 导致 MediaPipe 关键点检测在帧间产生 1–3 px 级别的抖动。
+        // 恢复时还需在文件顶部重新添加以下 import：
+        //   import android.graphics.BitmapFactory
+        //   import android.graphics.ImageFormat
+        //   import android.graphics.Rect
+        //   import android.graphics.YuvImage
+        //   import java.io.ByteArrayOutputStream
+        //
+        // val yBuffer = imageProxy.planes[0].buffer
+        // val uBuffer = imageProxy.planes[1].buffer
+        // val vBuffer = imageProxy.planes[2].buffer
+        // val ySize = yBuffer.remaining()
+        // val uSize = uBuffer.remaining()
+        // val vSize = vBuffer.remaining()
+        // val nv21 = ByteArray(ySize + uSize + vSize)
+        // yBuffer.get(nv21, 0, ySize)
+        // vBuffer.get(nv21, ySize, vSize)
+        // uBuffer.get(nv21, ySize + vSize, uSize)
+        // val yuvImage = YuvImage(nv21, ImageFormat.NV21, imageProxy.width, imageProxy.height, null)
+        // val out = ByteArrayOutputStream()
+        // yuvImage.compressToJpeg(Rect(0, 0, imageProxy.width, imageProxy.height), 80, out)
+        // val bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
 
         val matrix = Matrix()
         matrix.postRotate(imageProxy.imageInfo.rotationDegrees.toFloat())
-        // Front camera: flip horizontally so coordinates match the display.
+        // 前置摄像头：水平翻转，使坐标与屏幕显示方向一致。
         matrix.postScale(-1f, 1f)
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
             .also { bitmap.recycle() }
