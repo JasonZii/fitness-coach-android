@@ -46,19 +46,30 @@ import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
 import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.TrainingRecordEntity
+import com.example.fitnesscoach.user.viewmodel.UserViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun RecordListScreen(navController: NavHostController) {
+fun RecordListScreen(
+    navController: NavHostController,
+    userViewModel: UserViewModel
+) {
     val context = LocalContext.current
 
     val dao = remember(context) {
         AppDatabase.getInstance(context).trainingRecordDao()
     }
+    val ownerName = remember(userViewModel.isLoggedIn, userViewModel.username) {
+        if (userViewModel.isLoggedIn && userViewModel.username.isNotBlank()) {
+            userViewModel.username
+        } else {
+            "Guest"
+        }
+    }
 
-    val records by dao.getAllRecords().collectAsState(initial = emptyList())
+    val records by dao.getRecordsByOwner(ownerName).collectAsState(initial = emptyList())
 
     Column(
         modifier = Modifier

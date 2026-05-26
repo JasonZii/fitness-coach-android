@@ -34,6 +34,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.example.fitnesscoach.app.navigation.Routes
+import com.example.fitnesscoach.data.local.AppDatabase
 import com.example.fitnesscoach.data.local.UserPreferencesManager
 import com.example.fitnesscoach.user.viewmodel.UserViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -61,6 +64,19 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val userPrefs = remember { UserPreferencesManager(context) }
+    val dao = remember(context) {
+        AppDatabase.getInstance(context).trainingRecordDao()
+    }
+    val ownerName = remember(userViewModel.isLoggedIn, userViewModel.username) {
+        if (userViewModel.isLoggedIn && userViewModel.username.isNotBlank()) {
+            userViewModel.username
+        } else {
+            "Guest"
+        }
+    }
+    val trainingDays by dao.getTrainingDayCountByOwner(ownerName).collectAsState(initial = 0)
+    val totalDurationSeconds by dao.getTotalDurationSecondsByOwner(ownerName).collectAsState(initial = 0L)
+    val totalMinutes = formatTotalMinutes(totalDurationSeconds)
 
     Column(
         modifier = Modifier
@@ -139,12 +155,12 @@ fun ProfileScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ProfileStatCard(
-                value = "0",
+                value = trainingDays.toString(),
                 label = "Training Days",
                 modifier = Modifier.weight(1f)
             )
             ProfileStatCard(
-                value = "0",
+                value = totalMinutes.toString(),
                 label = "Total Minutes",
                 modifier = Modifier.weight(1f)
             )
@@ -366,4 +382,9 @@ private fun ProfileStatCard(
             }
         }
     }
+}
+
+private fun formatTotalMinutes(durationSeconds: Long): Int {
+    if (durationSeconds <= 0L) return 0
+    return ((durationSeconds + 59L) / 60L).toInt()
 }

@@ -8,11 +8,13 @@ import androidx.room.PrimaryKey
 data class TrainingRecordEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
+    val ownerName: String = "Guest",
     val exerciseId: String,
     val exerciseName: String,
     val repCount: Int,
     val avgScore: Int,
     val correctReps: Int,
     val incorrectReps: Int,
+    val durationSeconds: Long = 0L,
     val createdAt: Long = System.currentTimeMillis()
 )
