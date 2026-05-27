@@ -111,7 +111,6 @@ fun TrainingScreen(
                 }
             )
             SessionPhase.TRAINING  -> TrainingOverlay(
-                uiState = uiState,
                 onStop  = {
                     val repCount      = uiState.repCount
                     val avgScore      = if (uiState.repScores.isNotEmpty())
@@ -160,14 +159,36 @@ fun TrainingScreen(
             SessionPhase.FINISHED  -> Unit
         }
 
-        ReferenceSkeletonSwitch(
-            checked = showReferenceSkeleton,
-            onCheckedChange = {
-                showReferenceSkeleton = it
-                viewModel.showRefSkeleton = it
-            },
-            modifier = Modifier.align(Alignment.TopEnd)
-        )
+        if (uiState.phase != SessionPhase.FINISHED) {
+            TrainingTopHud(
+                uiState = uiState,
+                showReferenceSkeleton = showReferenceSkeleton,
+                onReferenceSkeletonChange = {
+                    showReferenceSkeleton = it
+                    viewModel.showRefSkeleton = it
+                },
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
+        }
+
+        if (uiState.phase == SessionPhase.TRAINING && uiState.isCameraDirectionWarningVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 148.dp, start = 16.dp, end = 16.dp)
+                    .fillMaxWidth()
+                    .background(Color(0xFFFF6F00).copy(alpha = 0.9f), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Turn side-on and match the reference video direction.",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
 
         // ── Layer 5: pause banner (on top of everything) ──────────────────────
         if (uiState.isTrainingPaused) {
@@ -189,40 +210,89 @@ fun TrainingScreen(
 }
 
 @Composable
-private fun ReferenceSkeletonSwitch(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+private fun TrainingTopHud(
+    uiState: TrainingUiState,
+    showReferenceSkeleton: Boolean,
+    onReferenceSkeletonChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
+    val latestRepScore = uiState.repScores.lastOrNull()?.toInt()
+
     Row(
         modifier = modifier
             .statusBarsPadding()
-            .padding(top = 72.dp, end = 16.dp)
-            .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 72.dp, start = 16.dp, end = 16.dp)
+            .fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top,
     ) {
-        Text(
-            text = "Blue skeleton",
-            color = Color(0xFFB0B0B0),
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = Color(0xFF3D7EFF),
-                uncheckedThumbColor = Color(0xFF8A8A8A),
-                uncheckedTrackColor = Color(0xFF3A3A3C),
-                uncheckedBorderColor = Color.Transparent,
+        TrainingStatsPanel {
+            TrainingMetric(
+                value = "${uiState.repCount}",
+                label = "REPS",
             )
-        )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            TrainingMetric(
+                value = latestRepScore?.toString() ?: "--",
+                label = "SCORE",
+            )
+        }
+
+        TrainingHudPanel {
+            Text(
+                text = "Skeleton",
+                color = Color(0xFFB0B0B0),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Switch(
+                checked = showReferenceSkeleton,
+                onCheckedChange = onReferenceSkeletonChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color(0xFF3D7EFF),
+                    uncheckedThumbColor = Color(0xFF8A8A8A),
+                    uncheckedTrackColor = Color(0xFF3A3A3C),
+                    uncheckedBorderColor = Color.Transparent,
+                )
+            )
+        }
     }
+}
+
+@Composable
+private fun TrainingStatsPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .widthIn(min = 96.dp)
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+    )
+}
+
+@Composable
+private fun TrainingHudPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = modifier
+            .heightIn(min = 66.dp)
+            .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
 }
 
 // ── Readiness overlay ─────────────────────────────────────────────────────────
@@ -327,53 +397,8 @@ private fun ReadinessOverlay(uiState: TrainingUiState, onCancel: () -> Unit) {
 // ── Training overlay ──────────────────────────────────────────────────────────
 
 @Composable
-private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
+private fun TrainingOverlay(onStop: () -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
-
-        // Top-left HUD: rep count
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding()
-                .padding(top = 72.dp, start = 16.dp)
-                .background(Color(0xFF1C1C1E).copy(alpha = 0.88f), RoundedCornerShape(14.dp))
-                .padding(horizontal = 18.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = "${uiState.repCount}",
-                color = Color.White,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "REPS",
-                color = Color(0xFFB0B0B0),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.5.sp,
-            )
-        }
-
-        if (uiState.isCameraDirectionWarningVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 148.dp, start = 16.dp, end = 16.dp)
-                    .fillMaxWidth()
-                    .background(Color(0xFFFF6F00).copy(alpha = 0.9f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Turn side-on and match the reference video direction.",
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-        }
-
         // Bottom-centre: stop button
         Button(
             onClick = onStop,
@@ -386,6 +411,32 @@ private fun TrainingOverlay(uiState: TrainingUiState, onStop: () -> Unit) {
         ) {
             Text("Stop Training", color = Color.White, fontWeight = FontWeight.SemiBold)
         }
+    }
+}
+
+@Composable
+private fun TrainingMetric(
+    value: String,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.widthIn(min = 54.dp),
+    ) {
+        Text(
+            text = value,
+            color = Color.White,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+        )
+        Text(
+            text = label,
+            color = Color(0xFFB0B0B0),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.5.sp,
+        )
     }
 }
 
