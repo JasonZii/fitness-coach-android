@@ -1,14 +1,19 @@
 package com.example.fitnesscoach.training.pose
 
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_COUNT
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_LEFT_WRIST
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_ELBOW
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_HIP
 import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_SHOULDER
+import com.example.fitnesscoach.core.util.Constants.LANDMARK_RIGHT_WRIST
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
+import kotlin.math.acos
 import kotlin.math.sqrt
 
 /**
@@ -37,6 +42,25 @@ class NormalizeLandmarksTest {
         val dx = a.first - b.first
         val dy = a.second - b.second
         return sqrt(dx * dx + dy * dy)
+    }
+
+    private fun angle2d(
+        landmarks: List<Triple<Float, Float, Float>>,
+        aIdx: Int,
+        vertexIdx: Int,
+        cIdx: Int,
+    ): Float {
+        val a = landmarks[aIdx]
+        val b = landmarks[vertexIdx]
+        val c = landmarks[cIdx]
+        val abx = a.first - b.first
+        val aby = a.second - b.second
+        val cbx = c.first - b.first
+        val cby = c.second - b.second
+        val abLen = sqrt(abx * abx + aby * aby)
+        val cbLen = sqrt(cbx * cbx + cby * cby)
+        val cosine = ((abx * cbx + aby * cby) / (abLen * cbLen)).coerceIn(-1f, 1f)
+        return Math.toDegrees(acos(cosine).toDouble()).toFloat()
     }
 
     private val eps = 0.001f
@@ -192,6 +216,31 @@ class NormalizeLandmarksTest {
             Pair(hipMidX,      hipMidY)
         )
         assertTrue(abs(torsoLength - 1f) < eps)
+    }
+
+    @Test
+    fun armProportionNormalisationPreservesElbowAngles() {
+        val frame = buildFrame(
+            mapOf(
+                LANDMARK_LEFT_SHOULDER  to Triple(0.35f, 0.20f, 0.02f),
+                LANDMARK_RIGHT_SHOULDER to Triple(0.65f, 0.20f, -0.01f),
+                LANDMARK_LEFT_HIP       to Triple(0.38f, 0.62f, 0.01f),
+                LANDMARK_RIGHT_HIP      to Triple(0.62f, 0.62f, -0.02f),
+                LANDMARK_LEFT_ELBOW     to Triple(0.29f, 0.39f, 0.05f),
+                LANDMARK_LEFT_WRIST     to Triple(0.37f, 0.55f, 0.12f),
+                LANDMARK_RIGHT_ELBOW    to Triple(0.74f, 0.36f, -0.06f),
+                LANDMARK_RIGHT_WRIST    to Triple(0.68f, 0.55f, -0.11f),
+            )
+        )
+
+        val result = normalizeLandmarks(frame, CameraAngle.FRONT)!!
+        val rawLeftElbow = angle2d(frame, LANDMARK_LEFT_WRIST, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_SHOULDER)
+        val rawRightElbow = angle2d(frame, LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER)
+        val normalisedLeftElbow = angle2d(result, LANDMARK_LEFT_WRIST, LANDMARK_LEFT_ELBOW, LANDMARK_LEFT_SHOULDER)
+        val normalisedRightElbow = angle2d(result, LANDMARK_RIGHT_WRIST, LANDMARK_RIGHT_ELBOW, LANDMARK_RIGHT_SHOULDER)
+
+        assertEquals(rawLeftElbow, normalisedLeftElbow, 0.001f)
+        assertEquals(rawRightElbow, normalisedRightElbow, 0.001f)
     }
 
     // ── z is dropped (not preserved in output) ───────────────────────────────

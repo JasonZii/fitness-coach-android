@@ -85,54 +85,75 @@ fun normalizeLandmarks(
     }.toMutableList()
 
     // ── Step 3: proportion normalisation ──────────────────────────────────
+    // Keep an immutable torso-normalised frame as the source of all directions.
+    // The output frame may move anchors and joints to canonical body proportions; deriving
+    // later limb directions from that mutated output would corrupt joint angles.
+    val base = scaled.toList()
+
     // Front view only: shoulder/hip width (depth axis makes these unreliable in side view)
     if (cameraAngle == CameraAngle.FRONT) {
-        rescaleFromMidpoint(scaled, LANDMARK_LEFT_SHOULDER, LANDMARK_RIGHT_SHOULDER, CANONICAL_SHOULDER_HALF)
-        rescaleFromMidpoint(scaled, LANDMARK_LEFT_HIP,      LANDMARK_RIGHT_HIP,      CANONICAL_HIP_HALF)
+        rescaleFromMidpoint(
+            source = base,
+            output = scaled,
+            leftIdx = LANDMARK_LEFT_SHOULDER,
+            rightIdx = LANDMARK_RIGHT_SHOULDER,
+            targetHalfWidth = CANONICAL_SHOULDER_HALF,
+        )
+        rescaleFromMidpoint(
+            source = base,
+            output = scaled,
+            leftIdx = LANDMARK_LEFT_HIP,
+            rightIdx = LANDMARK_RIGHT_HIP,
+            targetHalfWidth = CANONICAL_HIP_HALF,
+        )
     }
 
     // Arms: always, proximal before distal
-    rescaleSegment(scaled, LANDMARK_LEFT_SHOULDER,  LANDMARK_LEFT_ELBOW,  CANONICAL_UPPER_ARM)
-    rescaleSegment(scaled, LANDMARK_LEFT_ELBOW,     LANDMARK_LEFT_WRIST,  CANONICAL_FOREARM)
-    rescaleSegment(scaled, LANDMARK_RIGHT_SHOULDER, LANDMARK_RIGHT_ELBOW, CANONICAL_UPPER_ARM)
-    rescaleSegment(scaled, LANDMARK_RIGHT_ELBOW,    LANDMARK_RIGHT_WRIST, CANONICAL_FOREARM)
+    rebuildSegment(base, scaled, LANDMARK_LEFT_SHOULDER,  LANDMARK_LEFT_ELBOW,  CANONICAL_UPPER_ARM)
+    rebuildSegment(base, scaled, LANDMARK_LEFT_ELBOW,     LANDMARK_LEFT_WRIST,  CANONICAL_FOREARM)
+    rebuildSegment(base, scaled, LANDMARK_RIGHT_SHOULDER, LANDMARK_RIGHT_ELBOW, CANONICAL_UPPER_ARM)
+    rebuildSegment(base, scaled, LANDMARK_RIGHT_ELBOW,    LANDMARK_RIGHT_WRIST, CANONICAL_FOREARM)
 
     // Legs: full-body exercises only, proximal before distal
     if (requiresFullBody) {
-        rescaleSegment(scaled, LANDMARK_LEFT_HIP,   LANDMARK_LEFT_KNEE,   CANONICAL_THIGH)
-        rescaleSegment(scaled, LANDMARK_LEFT_KNEE,  LANDMARK_LEFT_ANKLE,  CANONICAL_LOWER_LEG)
-        rescaleSegment(scaled, LANDMARK_RIGHT_HIP,  LANDMARK_RIGHT_KNEE,  CANONICAL_THIGH)
-        rescaleSegment(scaled, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE, CANONICAL_LOWER_LEG)
+        rebuildSegment(base, scaled, LANDMARK_LEFT_HIP,   LANDMARK_LEFT_KNEE,   CANONICAL_THIGH)
+        rebuildSegment(base, scaled, LANDMARK_LEFT_KNEE,  LANDMARK_LEFT_ANKLE,  CANONICAL_LOWER_LEG)
+        rebuildSegment(base, scaled, LANDMARK_RIGHT_HIP,  LANDMARK_RIGHT_KNEE,  CANONICAL_THIGH)
+        rebuildSegment(base, scaled, LANDMARK_RIGHT_KNEE, LANDMARK_RIGHT_ANKLE, CANONICAL_LOWER_LEG)
     }
 
     return scaled
 }
 
 /**
- * Moves [childIdx] along the parent→child direction until the 3D segment length
- * equals [targetLength]. Scale is computed from the 3D length so the operation
- * is safe even when the limb points toward the camera (2D projection near zero).
- * All three components are scaled uniformly to preserve the 3D joint direction,
- * keeping joint angles intact for DTW and scoring.
+ * Rebuilds [childIdx] from the already-normalised output parent, using the original
+ * parent→child direction from [source] and a canonical 3D segment length.
+ *
+ * This removes body-proportion differences without chaining mutations into later limb
+ * directions. For example, after the elbow is moved to canonical upper-arm length, the
+ * wrist is still reconstructed from the original elbow→wrist direction, not from the
+ * moved elbow to the old wrist.
  */
-private fun rescaleSegment(
-    landmarks: MutableList<Triple<Float, Float, Float>>,
+private fun rebuildSegment(
+    source: List<Triple<Float, Float, Float>>,
+    output: MutableList<Triple<Float, Float, Float>>,
     parentIdx: Int,
     childIdx: Int,
     targetLength: Float,
 ) {
-    val parent = landmarks[parentIdx]
-    val child  = landmarks[childIdx]
-    val dx = child.first  - parent.first
-    val dy = child.second - parent.second
-    val dz = child.third  - parent.third
+    val sourceParent = source[parentIdx]
+    val child  = source[childIdx]
+    val dx = child.first  - sourceParent.first
+    val dy = child.second - sourceParent.second
+    val dz = child.third  - sourceParent.third
     val len3D = sqrt(dx * dx + dy * dy + dz * dz)
     if (len3D < 1e-6f) return
     val scale = (targetLength / len3D).coerceAtMost(MAX_SEGMENT_SCALE)
-    landmarks[childIdx] = Triple(
-        parent.first  + dx * scale,
-        parent.second + dy * scale,
-        parent.third  + dz * scale,
+    val outputParent = output[parentIdx]
+    output[childIdx] = Triple(
+        outputParent.first  + dx * scale,
+        outputParent.second + dy * scale,
+        outputParent.third  + dz * scale,
     )
 }
 
@@ -145,13 +166,14 @@ private fun rescaleSegment(
  * The z left-right asymmetry is a depth measurement artefact and is not amplified.
  */
 private fun rescaleFromMidpoint(
-    landmarks: MutableList<Triple<Float, Float, Float>>,
+    source: List<Triple<Float, Float, Float>>,
+    output: MutableList<Triple<Float, Float, Float>>,
     leftIdx: Int,
     rightIdx: Int,
     targetHalfWidth: Float,
 ) {
-    val left  = landmarks[leftIdx]
-    val right = landmarks[rightIdx]
+    val left  = source[leftIdx]
+    val right = source[rightIdx]
     val midX = (left.first  + right.first)  / 2f
     val midY = (left.second + right.second) / 2f
     val dxL = left.first  - midX
@@ -159,6 +181,6 @@ private fun rescaleFromMidpoint(
     val halfW2D = sqrt(dxL * dxL + dyL * dyL)
     if (halfW2D < 1e-6f) return
     val scale = (targetHalfWidth / halfW2D).coerceAtMost(MAX_SEGMENT_SCALE)
-    landmarks[leftIdx]  = Triple(midX + dxL * scale, midY + dyL * scale, left.third)
-    landmarks[rightIdx] = Triple(midX - dxL * scale, midY - dyL * scale, right.third)
+    output[leftIdx]  = Triple(midX + dxL * scale, midY + dyL * scale, left.third)
+    output[rightIdx] = Triple(midX - dxL * scale, midY - dyL * scale, right.third)
 }
